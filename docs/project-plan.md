@@ -1,0 +1,402 @@
+# Glassbox Project Plan
+
+Glassbox is a local LLM inference engine project built to learn ML infrastructure by progressively replacing black-box abstractions with explicit implementations.
+
+One-sentence goal:
+
+> Glassbox runs TinyLlama locally on GPU through an OpenAI-compatible API with custom greedy decoding, reporting latency, tokens/sec, and memory metrics while progressively exposing the inference stack.
+
+## Goals
+
+- Learn ML inference infrastructure internals.
+- Build a resume-worthy project with clear technical tradeoffs.
+- Produce a useful local model server as a secondary outcome.
+- Start with high-level abstractions, then break them one by one.
+- Keep each milestone demonstrable and end-to-end.
+
+## Non-Goals For MVP
+
+- Streaming responses.
+- Request batching.
+- Request queueing.
+- Concurrent request execution.
+- KV cache implementation.
+- Quantization.
+- CPU/GPU offloading.
+- Go control plane.
+- C++ or CUDA runtime code.
+- Docker.
+- Distributed inference runtime.
+
+## Terminology
+
+### Inference Server
+
+The HTTP/API layer that accepts client requests and formats responses.
+
+Responsibilities:
+
+- Expose `/health`.
+- Expose `/v1/models`.
+- Expose `/v1/completions`.
+- Expose `/v1/chat/completions`.
+- Validate OpenAI-style request fields.
+- Convert external API requests into internal engine requests.
+- Format OpenAI-compatible responses.
+
+### Inference Engine
+
+The library layer that owns the end-to-end generation workflow for one request.
+
+Responsibilities:
+
+- Accept a plain prompt and generation config.
+- Tokenize input.
+- Call the model runner.
+- Decode generated tokens.
+- Collect request metrics.
+- Return a structured generation result.
+
+### Inference Runtime
+
+The lower-level execution layer that actually runs model computation.
+
+In the first version, this is Hugging Face Transformers plus PyTorch. Later, parts of this may be replaced or inspected more deeply.
+
+### Model Runner
+
+The component that owns model loading and model execution.
+
+Initial implementation:
+
+- Load Hugging Face model at startup.
+- Use `model.generate()` for the walking skeleton.
+
+Later implementation:
+
+- Replace `model.generate()` with explicit `model.forward(...)` calls.
+- Implement greedy decoding manually.
+
+### Prompt Formatter
+
+The component that converts external prompt formats into model-ready text.
+
+Examples:
+
+- `/v1/completions`: raw prompt passes through.
+- `/v1/chat/completions`: chat messages are converted into a single prompt.
+- TinyLlama: use tokenizer chat template when available.
+
+### Scheduler
+
+A future component that decides which requests run and when.
+
+Deferred responsibilities:
+
+- Queuing.
+- Batching.
+- Cancellation.
+- Priorities.
+- Concurrent request handling.
+
+### Model Worker
+
+A future separate process that owns model memory and executes inference requests.
+
+The MVP starts as a single process. A later version may split into an API server and a model worker, potentially with a Go control plane and Python model worker.
+
+## Architecture
+
+```text
+Client / curl / benchmark / opencode
+        |
+        v
+FastAPI Inference Server
+        |
+        v
+OpenAI Request Validation
+        |
+        v
+Prompt Formatter
+        |
+        v
+Glassbox Inference Engine
+        |
+        v
+Tokenizer Wrapper
+        |
+        v
+Model Runner
+        |
+        v
+PyTorch + Transformers Runtime
+        |
+        v
+CPU / CUDA Hardware
+```
+
+## Target Hardware
+
+- OS: Ubuntu server.
+- CPU: Intel Core i9-9880H @ 2.30 GHz.
+- RAM: approximately 32 GB.
+- GPU: NVIDIA Quadro T2000 with 4 GB VRAM.
+
+## API Scope
+
+MVP endpoints:
+
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/completions`
+- `POST /v1/chat/completions`
+
+The API should mimic OpenAI closely enough for standard harnesses and clients.
+
+Validation behavior:
+
+- Reject `stream=true`.
+- Reject `temperature != 0`.
+- Reject `n > 1`.
+- Reject tools/function calling fields.
+- Ignore harmless unsupported fields only when clearly documented.
+- Default `max_tokens` to `64`.
+- Cap `max_tokens` at `128`.
+
+Response behavior:
+
+- Return only newly generated text, not the original prompt.
+- Include OpenAI-style `usage`.
+- Include custom `glassbox_metrics` during development.
+
+## Configuration
+
+Use environment variables for MVP configuration.
+
+Example:
+
+```text
+GLASSBOX_MODEL=gpt2
+GLASSBOX_DEVICE=cpu
+GLASSBOX_MAX_TOKENS=128
+```
+
+Rules:
+
+- Load one model per server process.
+- Load the model at server startup.
+- Fail startup if model loading fails.
+- Require explicit device selection: `cpu` or `cuda`.
+- Use `float32` on CPU.
+- Use `float16` on CUDA.
+- Do not support runtime model switching in MVP.
+
+## Metrics
+
+MVP metrics:
+
+- `model_load_seconds`
+- `prompt_tokens`
+- `completion_tokens`
+- `total_latency_ms`
+- `tokens_per_second`
+- `device`
+- `dtype`
+- `gpu_memory_allocated_mb`
+- `gpu_memory_reserved_mb`
+
+`/health` should include:
+
+- loaded status
+- configured model
+- device
+- dtype
+- model load time
+
+## Milestones
+
+### Milestone 1: Project Skeleton
+
+Outcome:
+
+> A Python project structure exists with FastAPI, config loading, a README, and minimal tests scaffold.
+
+Work:
+
+- Create Python package layout.
+- Create FastAPI app entry point.
+- Create engine/server module boundaries.
+- Add environment-based config.
+- Add README setup section.
+- Add minimal tests scaffold.
+
+### Milestone 2: OpenAI API Shell
+
+Outcome:
+
+> The server exposes OpenAI-style endpoints with validation and mock responses.
+
+Work:
+
+- Implement `GET /health`.
+- Implement `GET /v1/models`.
+- Implement `POST /v1/completions`.
+- Implement `POST /v1/chat/completions`.
+- Add strict validation for unsupported dangerous fields.
+- Add OpenAI-style response formatting.
+
+### Milestone 3: GPT-2 Walking Skeleton
+
+Outcome:
+
+> Glassbox serves `gpt2` on CPU using Hugging Face `model.generate()` and returns generated text through OpenAI-compatible endpoints.
+
+Work:
+
+- Load `gpt2` at startup.
+- Use Hugging Face tokenizer.
+- Use Hugging Face `model.generate()`.
+- Return only new generated text.
+- Add usage stats.
+- Add `glassbox_metrics`.
+- Demo with `curl`.
+
+### Milestone 4: Benchmark Script
+
+Outcome:
+
+> A tiny benchmark script can measure request latency and tokens/sec for a small prompt suite.
+
+Prompt suite:
+
+- Short prompt.
+- Medium prompt.
+- Chat-style prompt.
+
+Work:
+
+- Add `scripts/bench.py`.
+- Print results to stdout.
+- Do not persist benchmark results yet.
+
+### Milestone 5: Break `model.generate()` On GPT-2
+
+Outcome:
+
+> Glassbox implements custom greedy decoding for `gpt2` using `model.forward(...)` and full-sequence recomputation.
+
+Work:
+
+- Add a generation mode that does not call `model.generate()`.
+- Run the full sequence through `model.forward(...)` each step.
+- Select the next token with `argmax`.
+- Append the token and repeat until `max_tokens` or EOS.
+- Compare custom decode against Hugging Face `generate()`.
+- Document why this approach is inefficient.
+
+This is intentionally Level B decoding:
+
+```text
+prompt tokens
+-> forward full sequence
+-> pick next token
+-> append token
+-> forward full sequence again
+-> repeat
+```
+
+KV cache decoding is deferred.
+
+### Milestone 6: GPU Path
+
+Outcome:
+
+> Glassbox can run `gpt2` on both CPU and CUDA, with explicit device config and GPU memory metrics.
+
+Work:
+
+- Support `GLASSBOX_DEVICE=cpu|cuda`.
+- Move model and tensors to the selected device.
+- Use `float32` on CPU.
+- Use `float16` on CUDA.
+- Measure GPU memory allocated and reserved.
+- Benchmark `gpt2` CPU vs GPU.
+
+### Milestone 7: TinyLlama Final MVP
+
+Outcome:
+
+> Glassbox runs `TinyLlama/TinyLlama-1.1B-Chat-v1.0` on GPU through an OpenAI-compatible API using custom greedy decoding.
+
+Work:
+
+- Load `TinyLlama/TinyLlama-1.1B-Chat-v1.0`.
+- Use tokenizer chat template for chat requests.
+- Run CPU correctness checks.
+- Run TinyLlama on CUDA without offloading.
+- Preserve custom greedy decoding.
+- Record latency, tokens/sec, and memory metrics.
+- Benchmark TinyLlama with the fixed prompt suite.
+
+Strict final MVP rule:
+
+> TinyLlama must run on GPU for the final MVP to be considered complete.
+
+If TinyLlama does not fit in 4 GB VRAM without offloading, the final MVP is blocked until the GPU path is solved or the strict requirement is revisited.
+
+### Milestone 8: Final MVP Writeup
+
+Outcome:
+
+> The project has a clear setup guide, demos, benchmark results, and a learning-oriented explanation of the abstraction layers.
+
+Work:
+
+- Add `curl` demo.
+- Add benchmark demo.
+- Attempt opencode compatibility as a stretch goal.
+- Explain each abstraction layer.
+- Explain what was initially black-boxed.
+- Explain what was replaced.
+- Include benchmark table.
+- Include deferred roadmap.
+
+## Final MVP Definition
+
+The final MVP is complete when:
+
+- `TinyLlama/TinyLlama-1.1B-Chat-v1.0` runs on GPU.
+- The server exposes `/health`, `/v1/models`, `/v1/completions`, and `/v1/chat/completions`.
+- The chat endpoint uses an OpenAI-compatible request/response shape.
+- Generation uses custom greedy decoding instead of `model.generate()`.
+- Responses return only newly generated text.
+- Metrics include latency, tokens/sec, usage, device, dtype, and GPU memory.
+- A benchmark script can run a small fixed prompt suite.
+- The README explains setup, milestones, and what was learned.
+
+## Estimated Effort
+
+- Walking skeleton: 1 weekend.
+- Custom GPT-2 greedy decode: 1 weekend.
+- GPU path and benchmarks: 1 weekend.
+- TinyLlama final MVP and writeup: 1 weekend.
+
+Realistic total: 3-4 weekends, with CUDA setup and TinyLlama VRAM fit as the main risks.
+
+## Future Roadmap
+
+Post-MVP branches:
+
+- Implement KV cache decoding with `past_key_values`.
+- Add prefill vs decode timing.
+- Add time-to-first-token metrics.
+- Add streaming responses.
+- Add request queueing.
+- Add cancellation.
+- Add batching.
+- Explore quantization.
+- Split API server from model worker.
+- Explore Go for API/control-plane infrastructure.
+- Explore C++/CUDA for lower-level runtime pieces.
+- Study paged/slotted KV cache management.
+- Explore distributed inference runtime concepts.
