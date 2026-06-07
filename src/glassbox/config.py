@@ -4,16 +4,19 @@ from dataclasses import dataclass
 from typing import Literal
 
 
+Device = Literal["cpu", "cuda"]
+
 DEFAULT_MODEL = "gpt2"
-DEFAULT_DEVICE = "cpu"
-DEFAULT_MAX_TOKENS = 128
+DEFAULT_DEVICE: Device = "cpu"
+DEFAULT_TEMPERATURE = 0
+DEFAULT_MAX_TOKENS = 64
 MAX_ALLOWED_TOKENS = 128
 
 
 @dataclass(frozen=True)
 class Settings:
     model: str
-    device: Literal["cpu", "cuda"]
+    device: Device
     max_tokens: int
 
 
@@ -25,8 +28,12 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     if not model:
         raise ValueError("GLASSBOX_MODEL must not be empty")
 
-    device = source.get("GLASSBOX_DEVICE", DEFAULT_DEVICE).strip().lower()
-    if device not in {"cpu", "cuda"}:
+    raw_device = source.get("GLASSBOX_DEVICE", DEFAULT_DEVICE).strip().lower()
+    if raw_device == "cpu":
+        device: Device = "cpu"
+    elif raw_device == "cuda":
+        device = "cuda"
+    else:
         raise ValueError("GLASSBOX_DEVICE must be either 'cpu' or 'cuda'")
 
     raw_max_tokens = source.get(

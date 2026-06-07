@@ -7,7 +7,7 @@ def test_load_settings_uses_defaults() -> None:
     assert load_settings({}) == Settings(
         model="gpt2",
         device="cpu",
-        max_tokens=128,
+        max_tokens=64,
     )
 
 

@@ -215,7 +215,18 @@ MVP metrics:
 
 ## Milestones
 
-### Milestone 1: Project Skeleton
+Progress:
+
+- [x] Milestone 1: Project Skeleton
+- [x] Milestone 2: OpenAI API Shell
+- [ ] Milestone 3: GPT-2 Walking Skeleton
+- [ ] Milestone 4: Benchmark Script
+- [ ] Milestone 5: Break `model.generate()` On GPT-2
+- [ ] Milestone 6: GPU Path
+- [ ] Milestone 7: TinyLlama Final MVP
+- [ ] Milestone 8: Final MVP Writeup
+
+### Milestone 1: Project Skeleton - Complete
 
 Outcome:
 
@@ -223,14 +234,14 @@ Outcome:
 
 Work:
 
-- Create Python package layout.
-- Create FastAPI app entry point.
-- Create engine/server module boundaries.
-- Add environment-based config.
-- Add README setup section.
-- Add minimal tests scaffold.
+- [x] Create Python package layout.
+- [x] Create FastAPI app entry point.
+- [x] Create engine/server module boundaries.
+- [x] Add environment-based config.
+- [x] Add README setup section.
+- [x] Add minimal tests scaffold.
 
-### Milestone 2: OpenAI API Shell
+### Milestone 2: OpenAI API Shell - Complete
 
 Outcome:
 
@@ -238,12 +249,12 @@ Outcome:
 
 Work:
 
-- Implement `GET /health`.
-- Implement `GET /v1/models`.
-- Implement `POST /v1/completions`.
-- Implement `POST /v1/chat/completions`.
-- Add strict validation for unsupported dangerous fields.
-- Add OpenAI-style response formatting.
+- [x] Implement `GET /health`.
+- [x] Implement `GET /v1/models`.
+- [x] Implement `POST /v1/completions`.
+- [x] Implement `POST /v1/chat/completions`.
+- [x] Add strict validation for unsupported dangerous fields.
+- [x] Add OpenAI-style response formatting.
 
 ### Milestone 3: GPT-2 Walking Skeleton
 
