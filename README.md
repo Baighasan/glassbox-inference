@@ -64,6 +64,15 @@ Client / curl / benchmark / harness
         |
         v
 +---------------------------------------+
+| Client                                |
+|                                       |
+| - sends completion/chat requests      |
+| - receives generated text             |
+| - later: benchmark and load harness   |
++-------------------+-------------------+
+                    |
+                    v
++---------------------------------------+
 | Inference Server                      |
 | FastAPI                               |
 |                                       |
@@ -72,102 +81,96 @@ Client / curl / benchmark / harness
 | - /v1/completions                     |
 | - /v1/chat/completions                |
 | - OpenAI-compatible request handling  |
+| - request validation                  |
+| - response formatting                 |
+| - later: streaming and queueing       |
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
-| Prompt Layer                          |
+| Inference Runtime                     |
 |                                       |
-| - raw prompt passthrough              |
-| - chat messages -> model prompt       |
-| - TinyLlama chat template             |
+| - model/tokenizer lifecycle           |
+| - prompt formatting                   |
+| - generation configuration            |
+| - decoding loop orchestration         |
+| - latency, token, and memory metrics  |
+| - later: prefill/decode split         |
+| - later: KV cache visibility          |
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
 | Inference Engine                      |
 |                                       |
-| - generation config                   |
-| - tokenizer wrapper                   |
-| - model runner                        |
-| - metrics collection                  |
-+-------------------+-------------------+
-                    |
-                    v
-+---------------------------------------+
-| Model Runner                          |
-|                                       |
 | v0: Hugging Face model.generate()     |
-| v1: custom greedy decode loop         |
-| v2: KV cache and prefill/decode split |
-+-------------------+-------------------+
-                    |
-                    v
-+---------------------------------------+
-| Runtime                               |
-|                                       |
-| v0: PyTorch + Transformers            |
-| later: lower-level runtime pieces     |
+| v1: model.forward() + greedy decoding |
+| v2: explicit past_key_values usage    |
+| later: custom execution pieces        |
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
 | Hardware                              |
 |                                       |
-| CPU first                             |
-| then NVIDIA Quadro T2000, 4 GB VRAM   |
+| - CPU first                           |
+| - then CUDA GPU execution             |
+| - target: NVIDIA Quadro T2000, 4 GB   |
 +---------------------------------------+
 ```
 
 ## Abstraction-Breaking Plan
 
-### 1. End-To-End Black Box
+### 1. Client → Server: Build the API shell
 
-Use Hugging Face tokenizer, Hugging Face model loading, and `model.generate()` to get a complete local server working.
+Start with a working local FastAPI server that exposes OpenAI-compatible endpoints.
 
-Goal: prove the wires are connected before optimizing or replacing internals.
+Goal: make Glassbox usable as an actual inference service before replacing internal model execution pieces.
 
-### 2. Break Generation
+### 2. Server → Runtime: Isolate inference orchestration
 
-Replace `model.generate()` with a custom greedy decoding loop using `model.forward(...)`.
+Move all model-specific logic out of the API routes and into a runtime layer.
 
-Goal: understand how generated tokens are selected one step at a time.
+The server should handle HTTP, validation, and response formatting. The runtime should handle prompt formatting, model/tokenizer lifecycle, generation configuration, and metrics.
 
-### 3. Break Device Placement
+Goal: keep serving concerns separate from inference execution concerns.
 
-Move from CPU execution to explicit CUDA execution with clear dtype rules.
+### 3. Runtime → Engine: Start with a black-box engine
 
-Goal: understand model placement, tensor placement, fp32 vs fp16, and GPU memory pressure.
+Use Hugging Face `model.generate()` as the first engine implementation.
 
-### 4. Break Model Realism
+Goal: prove the full stack works end-to-end before breaking the model execution abstraction.
 
-Move from `gpt2` to `TinyLlama/TinyLlama-1.1B-Chat-v1.0`.
+### 4. Runtime → Engine: Replace `model.generate()`
 
-Goal: work with a more realistic chat model, tokenizer behavior, and chat template.
+Replace Hugging Face generation with a custom greedy decoding loop using `model.forward(...)`.
 
-### 5. Break Runtime Visibility
+Goal: understand token-by-token generation, logits, next-token selection, stopping conditions, and output decoding.
 
-Add prefill/decode timing and eventually implement KV cache support with `past_key_values`.
+### 5. Engine → Hardware: Make device behavior explicit
 
-Goal: understand why real inference engines separate prompt processing from token-by-token decoding.
+Move from CPU execution to explicit CUDA execution with clear dtype and tensor-placement rules.
 
-### 6. Break Serving Simplicity
+Goal: understand where the model lives, where tensors live, how fp32/fp16 affects memory, and how GPU memory pressure appears during inference.
 
-Add streaming, request queueing, cancellation, and batching after the single-request MVP works.
+### 6. Runtime → Engine: Add prefill/decode visibility
 
-Goal: move from a toy local server toward real inference-serving concerns.
+Measure prompt prefill separately from token-by-token decoding. Later, expose and use `past_key_values`.
 
-### 7. Break Process Boundaries
+Goal: understand why real inference systems separate prompt processing from incremental decoding.
 
-Split the API server from the model worker, potentially using a Go control plane and Python model worker.
+### 7. Client → Server: Add serving features after single-request inference works
 
-Goal: learn how production inference systems separate routing/control-plane concerns from model execution.
+Add streaming, request cancellation, request queueing, and eventually batching.
 
-### 8. Break Runtime Implementation
+Goal: move from a toy local server toward real inference-serving behavior without mixing serving logic into the runtime or engine.
 
-Explore quantization, C++ runtime pieces, CUDA kernels, and KV cache memory management later.
+### 8. Runtime → Engine → Hardware: Defer lower-level execution work
 
-Goal: move from using an ML framework to understanding lower-level inference runtime design.
+After the Python stack is solid, explore quantization, custom PyTorch execution pieces, C++ extensions, CUDA/Triton kernels, or lower-level memory management.
+
+Goal: only break into lower-level implementation once the higher-level stack boundaries are real and stable.
+
 
 ## MVP Milestones
 
