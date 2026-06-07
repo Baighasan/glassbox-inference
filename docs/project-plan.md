@@ -24,15 +24,33 @@ One-sentence goal:
 - Quantization.
 - CPU/GPU offloading.
 - Go control plane.
-- C++ or CUDA runtime code.
+- C++ or CUDA backend code.
 - Docker.
 - Distributed inference runtime.
 
 ## Terminology
 
+Glassbox uses this high-level stack:
+
+```text
+Client -> Server -> Runtime -> Engine -> Backend -> Hardware
+```
+
+The boundaries are intentionally broad during the MVP. More detailed ownership, such as scheduling, streaming, KV-cache management, and lower-level execution pieces, can be refined when those features are implemented.
+
+### Client
+
+The caller that sends inference requests and consumes generated text.
+
+Examples:
+
+- `curl`.
+- Benchmark harnesses.
+- OpenAI-compatible SDKs or tools.
+
 ### Inference Server
 
-The HTTP/API layer that accepts client requests and formats responses.
+The network-facing layer of the system. It accepts requests from clients, validates them, invokes the runtime, and returns responses.
 
 Responsibilities:
 
@@ -41,45 +59,52 @@ Responsibilities:
 - Expose `/v1/completions`.
 - Expose `/v1/chat/completions`.
 - Validate OpenAI-style request fields.
-- Convert external API requests into internal engine requests.
 - Format OpenAI-compatible responses.
-
-### Inference Engine
-
-The library layer that owns the end-to-end generation workflow for one request.
-
-Responsibilities:
-
-- Accept a plain prompt and generation config.
-- Tokenize input.
-- Call the model runner.
-- Decode generated tokens.
-- Collect request metrics.
-- Return a structured generation result.
+- Handle protocol-level serving concerns as they are added later.
 
 ### Inference Runtime
 
-The lower-level execution layer that actually runs model computation.
+The orchestration layer for inference. It manages resources, prepares requests for execution, invokes the engine, and collects request-level results.
 
-In the first version, this is Hugging Face Transformers plus PyTorch. Later, parts of this may be replaced or inspected more deeply.
+Responsibilities:
 
-### Model Runner
+- Manage model and tokenizer lifecycle.
+- Format prompts.
+- Configure generation.
+- Coordinate execution through the engine.
+- Collect latency, token, and memory metrics.
 
-The component that owns model loading and model execution.
+### Inference Engine
+
+The model execution layer. It implements generation behavior and turns prepared inputs into generated token IDs.
 
 Initial implementation:
 
-- Load Hugging Face model at startup.
-- Use `model.generate()` for the walking skeleton.
+- Use Hugging Face `model.generate()` as a black-box engine.
 
 Later implementation:
 
 - Replace `model.generate()` with explicit `model.forward(...)` calls.
-- Implement greedy decoding manually.
+- Implement token-by-token greedy decoding.
+- Expose more of prefill, decode, logits processing, and KV-cache behavior.
+
+### Backend
+
+The computational implementation used by the engine.
+
+Initial backend:
+
+- Transformers model code running on PyTorch.
+
+Later backends or backend pieces:
+
+- More explicit PyTorch execution.
+- Custom C++ extensions.
+- Custom CUDA or Triton kernels.
 
 ### Prompt Formatter
 
-The component that converts external prompt formats into model-ready text.
+The component that converts external prompt formats into model-ready text. This is part of the runtime in the MVP, but may become a distinct module as the project grows.
 
 Examples:
 
@@ -89,7 +114,7 @@ Examples:
 
 ### Scheduler
 
-A future component that decides which requests run and when.
+A future runtime component that decides which requests run and when.
 
 Deferred responsibilities:
 
@@ -120,16 +145,13 @@ OpenAI Request Validation
 Prompt Formatter
         |
         v
+Glassbox Inference Runtime
+        |
+        v
 Glassbox Inference Engine
         |
         v
-Tokenizer Wrapper
-        |
-        v
-Model Runner
-        |
-        v
-PyTorch + Transformers Runtime
+Transformers + PyTorch Backend
         |
         v
 CPU / CUDA Hardware
@@ -408,6 +430,6 @@ Post-MVP branches:
 - Explore quantization.
 - Split API server from model worker.
 - Explore Go for API/control-plane infrastructure.
-- Explore C++/CUDA for lower-level runtime pieces.
+- Explore C++/CUDA for lower-level backend pieces.
 - Study paged/slotted KV cache management.
 - Explore distributed inference runtime concepts.

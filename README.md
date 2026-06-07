@@ -2,7 +2,7 @@
 
 Glassbox is a local LLM inference engine built to learn ML inference infrastructure by progressively replacing black-box abstractions with explicit implementations.
 
-The goal is to start with a working end-to-end model server, then peel back each layer: generation, decoding, device placement, model execution, memory behavior, and eventually serving/runtime concerns.
+The goal is to start with a working end-to-end model server, then peel back each layer of the stack: client, server, runtime, engine, backend, and hardware.
 
 ## Target MVP
 
@@ -93,7 +93,7 @@ Client / curl / benchmark / harness
 | - model/tokenizer lifecycle           |
 | - prompt formatting                   |
 | - generation configuration            |
-| - decoding loop orchestration         |
+| - inference orchestration             |
 | - latency, token, and memory metrics  |
 | - later: prefill/decode split         |
 | - later: KV cache visibility          |
@@ -106,7 +106,16 @@ Client / curl / benchmark / harness
 | v0: Hugging Face model.generate()     |
 | v1: model.forward() + greedy decoding |
 | v2: explicit past_key_values usage    |
-| later: custom execution pieces        |
+| later: custom generation logic        |
++-------------------+-------------------+
+                    |
+                    v
++---------------------------------------+
+| Backend                               |
+|                                       |
+| - v0: Transformers + PyTorch          |
+| - later: explicit PyTorch pieces      |
+| - later: custom CUDA/Triton kernels   |
 +-------------------+-------------------+
                     |
                     v
@@ -147,7 +156,7 @@ Replace Hugging Face generation with a custom greedy decoding loop using `model.
 
 Goal: understand token-by-token generation, logits, next-token selection, stopping conditions, and output decoding.
 
-### 5. Engine → Hardware: Make device behavior explicit
+### 5. Engine → Backend → Hardware: Make device behavior explicit
 
 Move from CPU execution to explicit CUDA execution with clear dtype and tensor-placement rules.
 
@@ -165,7 +174,7 @@ Add streaming, request cancellation, request queueing, and eventually batching.
 
 Goal: move from a toy local server toward real inference-serving behavior without mixing serving logic into the runtime or engine.
 
-### 8. Runtime → Engine → Hardware: Defer lower-level execution work
+### 8. Engine → Backend → Hardware: Defer lower-level execution work
 
 After the Python stack is solid, explore quantization, custom PyTorch execution pieces, C++ extensions, CUDA/Triton kernels, or lower-level memory management.
 
@@ -195,7 +204,7 @@ These are intentionally out of scope for the first MVP:
 - Quantization.
 - CPU/GPU offloading.
 - Go control plane.
-- C++ or CUDA runtime code.
+- C++ or CUDA backend code.
 - Docker.
 - Distributed inference runtime.
 
