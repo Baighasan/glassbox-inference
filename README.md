@@ -10,6 +10,53 @@ Glassbox runs `TinyLlama/TinyLlama-1.1B-Chat-v1.0` locally on GPU through an Ope
 
 The first walking skeleton uses `gpt2` and Hugging Face `model.generate()` so the full system works before the internals are replaced.
 
+## Setup
+
+Glassbox requires Python 3.12 and
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+
+Install the project and its dependencies:
+
+```bash
+uv sync
+```
+
+Glassbox reads its runtime configuration from environment variables:
+
+| Variable | Default | Allowed values |
+| --- | --- | --- |
+| `GLASSBOX_MODEL` | `gpt2` | Any non-empty model identifier |
+| `GLASSBOX_DEVICE` | `cpu` | `cpu` or `cuda` |
+| `GLASSBOX_MAX_TOKENS` | `128` | Integer from `1` through `128` |
+
+For example:
+
+```bash
+export GLASSBOX_MODEL=gpt2
+export GLASSBOX_DEVICE=cpu
+export GLASSBOX_MAX_TOKENS=128
+```
+
+Start the local API server:
+
+```bash
+uv run glassbox
+```
+
+The server listens on `http://127.0.0.1:8000`.
+
+Run the test suite:
+
+```bash
+uv run --with pytest pytest
+```
+
+Build the wheel and source distribution:
+
+```bash
+uv build
+```
+
 ## Stack
 
 ```text
