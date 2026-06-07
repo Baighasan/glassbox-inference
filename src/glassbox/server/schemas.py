@@ -27,12 +27,8 @@ class CompletionRequest(StrictRequest):
         ge=1,
         le=MAX_ALLOWED_TOKENS,
     )
-    temperature: Literal[0] = DEFAULT_TEMPERATURE
-    top_p: Literal[1] = 1
-    n: Literal[1] = 1
+    temperature: float = DEFAULT_TEMPERATURE
     stream: Literal[False] = False
-    stop: str | list[str] | None = None
-    echo: Literal[False] = False
 
 
 class CompletionResponseChoice(BaseModel):
@@ -69,7 +65,7 @@ class ChatMessage(BaseModel):
 class ChatCompletionRequest(StrictRequest):
     model: str
     messages: list[ChatMessage] = Field(min_length=1)
-    temperature: Literal[0] = DEFAULT_TEMPERATURE
+    temperature: float = DEFAULT_TEMPERATURE
     max_tokens: int = Field(
         default=DEFAULT_MAX_TOKENS,
         ge=1,

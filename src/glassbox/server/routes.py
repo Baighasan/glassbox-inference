@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 
 from glassbox.config import Settings
+from glassbox.runtime.runtime import generate
 from glassbox.server.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -102,7 +103,7 @@ async def completions(
     settings = _settings(request)
     _require_configured_model(payload.model, settings)
 
-    generated_text = "This is a simulated completion."
+    generated_text = generate(payload.prompt, payload.max_tokens, payload.temperature)
     usage = _mock_usage(payload.prompt, generated_text)
 
     return CompletionResponse(
