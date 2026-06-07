@@ -1,6 +1,6 @@
 # Glassbox Project Plan
 
-Glassbox is a local LLM inference engine project built to learn ML infrastructure by progressively replacing black-box abstractions with explicit implementations.
+Glassbox is a local LLM inference stack built to learn ML infrastructure by progressively replacing black-box abstractions with explicit implementations.
 
 One-sentence goal:
 
@@ -80,7 +80,7 @@ The model execution layer. It implements generation behavior and turns prepared 
 
 Initial implementation:
 
-- Use Hugging Face `model.generate()` as a black-box engine.
+- Use Hugging Face `model.generate()` as the first black-box generation path behind the engine interface.
 
 Later implementation:
 

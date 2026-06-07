@@ -1,6 +1,6 @@
 # Glassbox
 
-Glassbox is a local LLM inference engine built to learn ML inference infrastructure by progressively replacing black-box abstractions with explicit implementations.
+Glassbox is a local LLM inference stack built to learn ML inference infrastructure by progressively replacing black-box abstractions with explicit implementations.
 
 The goal is to start with a working end-to-end model server, then peel back each layer of the stack: client, server, runtime, engine, backend, and hardware.
 
@@ -103,20 +103,20 @@ Client / curl / benchmark / harness
 +---------------------------------------+
 | Inference Engine                      |
 |                                       |
-| v0: Hugging Face model.generate()     |
+| v0: black-box HF generation path      |
 | v1: model.forward() + greedy decoding |
 | v2: explicit past_key_values usage    |
-| later: custom generation logic        |
+| later: custom execution pieces        |
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
 | Backend                               |
 |                                       |
-| - v0: Transformers + PyTorch          |
-| - later: explicit PyTorch pieces      |
+| - v0: PyTorch execution under HF      |
+| - later: explicit PyTorch operations  |
 | - later: custom CUDA/Triton kernels   |
-+-------------------+-------------------+
+-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
