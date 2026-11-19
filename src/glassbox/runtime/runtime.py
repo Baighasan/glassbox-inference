@@ -1,20 +1,17 @@
-from transformers import pipeline
 from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
+from glassbox.runtime.model import ModelManager
 
 
-def generate(
-    text: str,
+async def generate(
+    model_manager: ModelManager,
+    model_name: str = "openai-community/gpt2",
+    text: str = "",
     max_tokens: int = DEFAULT_MAX_TOKENS,
     temperature: float = DEFAULT_TEMPERATURE,
 ) -> str:
-    # Initialize the pipeline with the base gpt2 model
-    generator = pipeline(
-        "text-generation",
-        model="openai-community/gpt2",
-        device="cpu",
-    )
+    """ Generate text using the model. """
+    generator = await model_manager.get_model(task="text-generation", model_name=model_name)
 
-    # Build dynamic config
     gen_kwargs = {
         "max_new_tokens": max_tokens,
         "do_sample": False if temperature == 0.0 else True,

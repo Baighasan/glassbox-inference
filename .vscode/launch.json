@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Glassbox server",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "uv run uvicorn glassbox.server.app:app --reload --reload-dir src --host 127.0.0.1 --port 8000",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

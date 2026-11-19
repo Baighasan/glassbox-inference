@@ -1,19 +1,29 @@
+from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
-from glassbox.config import Settings, load_settings
 from glassbox.server.routes import router
+
+from glassbox.runtime.model import ModelManager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize manager
+    app.state.model_manager = ModelManager()
+    yield
+    # Shutdown: Free all models
+    await app.state.model_manager.shutdown()
 
 
 def create_app(
     api_router: APIRouter = router,
-    settings: Settings | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Glassbox",
         description="A local LLM inference server.",
         version="0.1.0",
+        lifespan=lifespan,
     )
-    app.state.settings = settings or load_settings()
     app.include_router(api_router)
     return app
 
