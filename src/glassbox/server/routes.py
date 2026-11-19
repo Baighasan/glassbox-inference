@@ -54,11 +54,11 @@ def _mock_metrics(
 async def health(request: Request) -> HealthResponse:
     return HealthResponse(
         status="alive",
-        loaded=False,
-        model="openai-community/gpt2",
+        loaded=False if request.app.state.model_manager.model is None else True,
+        model=request.app.state.model_manager.model_name,
         device="cpu",
         dtype="float32",
-        model_load_seconds=None,
+        model_load_seconds=request.app.state.model_manager.model_load_seconds,
     )
 
 
@@ -133,5 +133,5 @@ async def chat_completions(
             )
         ],
         usage=usage,
-        glassbox_metrics=_mock_metrics(started_at, usage, "openai-community/gpt2"),
+        glassbox_metrics=_mock_metrics(started_at, usage),
     )

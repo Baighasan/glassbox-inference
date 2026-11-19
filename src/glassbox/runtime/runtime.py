@@ -20,7 +20,7 @@ async def generate(
         gen_kwargs["temperature"] = temperature
 
     # Generate text
-    raw_output = generator(text, **gen_kwargs)
+    raw_output = generator(text, **gen_kwargs, return_full_text=False)
     cleaned_output = raw_output[0]["generated_text"]
 
     return cleaned_output

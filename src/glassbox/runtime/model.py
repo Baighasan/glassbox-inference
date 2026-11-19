@@ -18,7 +18,7 @@ class ModelManager:
 
         # TODO: Remove this once we support more models
         if model_name != "openai-community/gpt2":
-            raise HTTPException(status_code=400, detail="Only openai-community/gpt2 is supported at the moment.")
+            raise HTTPException(status_code=404, detail="Only openai-community/gpt2 is supported at the moment.")
 
         async with self.lock:
             # If the model is already loaded, return it
@@ -36,12 +36,18 @@ class ModelManager:
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to load model '{model_name}': {str(e)}")
 
+            # Unload the old model if it exists
+            if self.model:
+                self._unload_model(self.model)
+
             self.model = new_pipe
             self.model_name = model_name
             return new_pipe
 
     def _unload_model(self, pipe: Pipeline):
         """ Explicitly free CPU and GPU memory. """
+        if self.lock.locked():
+            raise RuntimeError("Cannot unload model while lock is locked.")
         del pipe
         gc.collect()
         if torch.cuda.is_available():
