@@ -98,7 +98,6 @@ class HealthResponse(BaseModel):
     model: str
     device: Literal["cpu", "cuda"]
     dtype: Literal["float32", "float16"]
-    model_load_seconds: float | None
 
 
 class ModelInfo(BaseModel):

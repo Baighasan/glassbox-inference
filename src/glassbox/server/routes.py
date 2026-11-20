@@ -58,7 +58,6 @@ async def health(request: Request) -> HealthResponse:
         model=request.app.state.model_manager.model_name,
         device="cpu",
         dtype="float32",
-        model_load_seconds=request.app.state.model_manager.model_load_seconds,
     )
 
 
