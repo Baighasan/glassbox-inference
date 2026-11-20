@@ -1,5 +1,5 @@
 from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
-from glassbox.runtime.model import ModelManager
+from glassbox.engine.model import ModelManager
 
 
 async def generate(

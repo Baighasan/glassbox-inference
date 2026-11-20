@@ -3,7 +3,7 @@ from fastapi import APIRouter, FastAPI
 
 from glassbox.server.routes import router
 
-from glassbox.runtime.model import ModelManager
+from glassbox.engine.model import ModelManager
 
 
 @asynccontextmanager

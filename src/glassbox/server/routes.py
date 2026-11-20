@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 
-from glassbox.runtime.runtime import generate
+from glassbox.engine.engine import generate
 from glassbox.server.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
