@@ -6,12 +6,13 @@ Glassbox is a Python 3.12 project using a `src` layout.
 
 - `src/glassbox/`: application package.
 - `src/glassbox/server/`: FastAPI app, routes, and request/response schemas.
-- `src/glassbox/engine/`: model loading and inference logic.
-- `src/glassbox/config.py`: environment-driven runtime configuration.
+- `src/glassbox/engine/`: tokenization, prompt formatting, the decode loop, and sampling.
+- `src/glassbox/runtime/`: model weights, device memory, and the forward pass.
+- `src/glassbox/config.py`: environment-driven configuration.
 - `tests/`: pytest tests; server-specific tests live in `tests/server/`.
 - `docs/project-plan.md`: architecture, milestones, configuration, and scope.
 
-Keep HTTP concerns in `server`, inference behavior in `engine`, and shared configuration at the package root. Do not add deferred features such as batching or streaming without aligning them with the project plan.
+Keep HTTP concerns in `server`, the decode loop in `engine`, and weight loading and `forward` execution in `runtime`. Shared configuration stays at the package root. Do not add deferred features such as batching or streaming without aligning them with the project plan. The current tree still has generation inside `runtime/` until Milestone 3 splits `engine/` and `runtime/`.
 
 ## Build, Test, and Development Commands
 
@@ -34,7 +35,7 @@ No formatter or linter is currently configured. Keep code PEP 8 compliant and av
 
 ## Testing Guidelines
 
-Write tests with pytest. Name files `test_*.py` and test functions `test_<behavior>`. Mirror source ownership where useful, such as `tests/server/` for API behavior. Cover configuration defaults and overrides, endpoint status and schemas, and engine behavior without requiring a GPU unless the test is explicitly marked as hardware-dependent.
+Write tests with pytest. Name files `test_*.py` and test functions `test_<behavior>`. Mirror source ownership where useful, such as `tests/server/` for API behavior. Cover configuration defaults and overrides, endpoint status and schemas, and engine and runtime behavior without requiring a GPU unless the test is explicitly marked as hardware-dependent.
 
 ## Commit & Pull Request Guidelines
 

@@ -24,19 +24,21 @@ One-sentence goal:
 - Quantization.
 - CPU/GPU offloading.
 - Go control plane.
-- C++ or CUDA backend code.
+- C++ or CUDA kernel code.
 - Docker.
-- Distributed inference runtime.
+- Distributed execution.
 
 ## Terminology
 
-Glassbox uses this high-level stack:
+Glassbox uses this stack:
 
 ```text
-Client -> Server -> Runtime -> Engine -> Backend -> Hardware
+Client -> Server -> Engine -> Runtime -> Hardware
 ```
 
-The boundaries are intentionally broad during the MVP. More detailed ownership, such as scheduling, streaming, KV-cache management, and lower-level execution pieces, can be refined when those features are implemented.
+The server accepts text and returns text. The engine owns the tokenizer and the decode loop. The runtime owns weights, device memory, and the forward pass. Scheduling, streaming, paged KV cache, and custom kernels stay behind those same owners and are implemented after the MVP.
+
+`model.generate()` is a walking-skeleton shortcut. It fuses the engine loop and the runtime forward, so it lives in the runtime only until Milestone 5 splits them.
 
 ### Client
 
@@ -48,9 +50,9 @@ Examples:
 - Benchmark harnesses.
 - OpenAI-compatible SDKs or tools.
 
-### Inference Server
+### Server
 
-The network-facing layer of the system. It accepts requests from clients, validates them, invokes the runtime, and returns responses.
+The network-facing layer. It accepts text and generation settings, calls the engine, and formats the response. It does not tokenize.
 
 Responsibilities:
 
@@ -59,76 +61,64 @@ Responsibilities:
 - Expose `/v1/completions`.
 - Expose `/v1/chat/completions`.
 - Validate OpenAI-style request fields.
-- Format OpenAI-compatible responses.
-- Handle protocol-level serving concerns as they are added later.
+- Format OpenAI-compatible responses, including `usage` and `glassbox_metrics`.
+- Read loaded model, device, dtype, and load time for `/health`.
 
-### Inference Runtime
+Later:
 
-The orchestration layer for inference. It manages resources, prepares requests for execution, invokes the engine, and collects request-level results.
+- Streaming.
+- A queue in front of the engine.
+
+### Engine
+
+The control loop for one request. It owns the tokenizer.
 
 Responsibilities:
 
-- Manage model and tokenizer lifecycle.
+- Load and use the Hugging Face tokenizer.
 - Format prompts.
-- Configure generation.
-- Coordinate execution through the engine.
-- Collect latency, token, and memory metrics.
+- Call the runtime, choose the next token, and stop at `max_tokens` or EOS.
+- Count `prompt_tokens` and `completion_tokens`.
+- Measure `total_latency_ms` and `tokens_per_second`.
 
-### Inference Engine
-
-The model execution layer. It implements generation behavior and turns prepared inputs into generated token IDs.
-
-Initial implementation:
-
-- Use Hugging Face `model.generate()` as the first black-box generation path behind the engine interface.
-
-Later implementation:
-
-- Replace `model.generate()` with explicit `model.forward(...)` calls.
-- Implement token-by-token greedy decoding.
-- Expose more of prefill, decode, logits processing, and KV-cache behavior.
-
-### Backend
-
-The computational implementation used by the engine.
-
-Initial backend:
-
-- Transformers model code running on PyTorch.
-
-Later backends or backend pieces:
-
-- More explicit PyTorch execution.
-- Custom C++ extensions.
-- Custom CUDA or Triton kernels.
-
-### Prompt Formatter
-
-The component that converts external prompt formats into model-ready text. This is part of the runtime in the MVP, but may become a distinct module as the project grows.
-
-Examples:
+Prompt formatting:
 
 - `/v1/completions`: raw prompt passes through.
-- `/v1/chat/completions`: chat messages are converted into a single prompt.
-- TinyLlama: use tokenizer chat template when available.
+- `/v1/chat/completions`: chat messages are joined into a single prompt until Milestone 7.
+- TinyLlama: use the tokenizer chat template.
 
-### Scheduler
+Milestone 3 implements the runtime call as one `model.generate()`. Milestone 5 replaces that call with a greedy loop over `forward(...) -> logits`.
 
-A future runtime component that decides which requests run and when.
+Later, as engine components:
 
-Deferred responsibilities:
+- Scheduler: queueing, continuous batching, cancellation, priorities, and concurrent requests.
+- Logical KV block map for paged cache management.
+- Sampling beyond greedy argmax, including temperature and top-p.
+- Prefill versus decode timing, and time to first token.
 
-- Queuing.
-- Batching.
-- Cancellation.
-- Priorities.
-- Concurrent request handling.
+### Runtime
 
-### Model Worker
+Weights, device memory, and one forward pass.
 
-A future separate process that owns model memory and executes inference requests.
+```python
+logits = forward(input_ids, attention_mask)
+```
 
-The MVP starts as a single process. A later version may split into an API server and a model worker, potentially with a Go control plane and Python model worker.
+Responsibilities:
+
+- Load one model at startup and fail startup if loading fails.
+- Place weights and tensors on `cpu` or `cuda`.
+- Use `float32` on CPU and `float16` on CUDA.
+- Report `model_load_seconds`, `device`, `dtype`, `gpu_memory_allocated_mb`, and `gpu_memory_reserved_mb`.
+
+Implementations:
+
+- Milestone 3: `model.generate()` returns token ids. This hides the decode loop inside Hugging Face.
+- Milestone 5: the public method is `forward(...) -> logits` on the PyTorch module.
+- Later: the same method accepts `past_key_values` or KV block tables.
+- Later: Triton, CUDA, or GGML can replace the PyTorch forward without changing the server or the engine loop.
+
+The MVP is one process. A later split is a server process and a worker process that hosts the runtime.
 
 ## Architecture
 
@@ -136,25 +126,16 @@ The MVP starts as a single process. A later version may split into an API server
 Client / curl / benchmark / opencode
         |
         v
-FastAPI Inference Server
+Server          HTTP, validation, response JSON
         |
         v
-OpenAI Request Validation
+Engine          tokenize, prompt format, decode loop, sampling, stop
         |
         v
-Prompt Formatter
+Runtime         weights, device buffers, forward -> logits
         |
         v
-Glassbox Inference Runtime
-        |
-        v
-Glassbox Inference Engine
-        |
-        v
-Transformers + PyTorch Backend
-        |
-        v
-CPU / CUDA Hardware
+Hardware        CPU, then CUDA
 ```
 
 ## Target Hardware
@@ -211,7 +192,7 @@ Rules:
 - Require explicit device selection: `cpu` or `cuda`.
 - Use `float32` on CPU.
 - Use `float16` on CUDA.
-- Do not support runtime model switching in MVP.
+- Do not switch models after startup in the MVP.
 
 ## Metrics
 
@@ -226,6 +207,12 @@ MVP metrics:
 - `dtype`
 - `gpu_memory_allocated_mb`
 - `gpu_memory_reserved_mb`
+
+Ownership:
+
+- The engine counts tokens and measures request latency and tokens/sec.
+- The runtime reports load time, device, dtype, and GPU memory.
+- The server attaches `usage` and `glassbox_metrics` to the response.
 
 `/health` should include:
 
@@ -282,17 +269,18 @@ Work:
 
 Outcome:
 
-> Glassbox serves `gpt2` on CPU using Hugging Face `model.generate()` and returns generated text through OpenAI-compatible endpoints.
+> The server calls the engine, the engine calls the runtime, and `gpt2` on CPU returns only new text through `/v1/completions`.
 
 Work:
 
-- Load `gpt2` at startup.
-- Use Hugging Face tokenizer.
-- Use Hugging Face `model.generate()`.
+- Add `server`, `engine`, and `runtime` packages matching the ownership above.
+- Load `gpt2` and its tokenizer at startup.
+- Engine formats the completion prompt and decodes new token ids.
+- Runtime call is Hugging Face `model.generate()`.
 - Return only new generated text.
-- Add usage stats.
-- Add `glassbox_metrics`.
+- Add real usage stats and `glassbox_metrics`.
 - Demo with `curl`.
+- Leave `/v1/chat/completions` on the mock response until Milestone 7.
 
 ### Milestone 4: Benchmark Script
 
@@ -316,25 +304,25 @@ Work:
 
 Outcome:
 
-> Glassbox implements custom greedy decoding for `gpt2` using `model.forward(...)` and full-sequence recomputation.
+> The engine runs greedy decoding, and the runtime's public method is `forward(...) -> logits`.
 
 Work:
 
-- Add a generation mode that does not call `model.generate()`.
+- Remove the `model.generate()` path.
 - Run the full sequence through `model.forward(...)` each step.
-- Select the next token with `argmax`.
+- Engine selects the next token with `argmax`.
 - Append the token and repeat until `max_tokens` or EOS.
-- Compare custom decode against Hugging Face `generate()`.
-- Document why this approach is inefficient.
+- Compare the loop against Hugging Face `generate()` on a fixed prompt.
+- Document why full-sequence recomputation is inefficient.
 
 This is intentionally Level B decoding:
 
 ```text
 prompt tokens
--> forward full sequence
--> pick next token
+-> runtime.forward(full sequence) -> logits
+-> engine argmax
 -> append token
--> forward full sequence again
+-> runtime.forward(full sequence) again
 -> repeat
 ```
 
@@ -344,7 +332,7 @@ KV cache decoding is deferred.
 
 Outcome:
 
-> Glassbox can run `gpt2` on both CPU and CUDA, with explicit device config and GPU memory metrics.
+> The runtime can run `gpt2` on both CPU and CUDA, with explicit device config and GPU memory metrics.
 
 Work:
 
@@ -363,8 +351,8 @@ Outcome:
 
 Work:
 
-- Load `TinyLlama/TinyLlama-1.1B-Chat-v1.0`.
-- Use tokenizer chat template for chat requests.
+- Runtime loads `TinyLlama/TinyLlama-1.1B-Chat-v1.0`.
+- Engine uses the tokenizer chat template for chat requests.
 - Run CPU correctness checks.
 - Run TinyLlama on CUDA without offloading.
 - Preserve custom greedy decoding.
@@ -418,18 +406,27 @@ Realistic total: 3-4 weekends, with CUDA setup and TinyLlama VRAM fit as the mai
 
 ## Future Roadmap
 
-Post-MVP branches:
+Post-MVP work, by owner:
 
-- Implement KV cache decoding with `past_key_values`.
-- Add prefill vs decode timing.
-- Add time-to-first-token metrics.
+Server:
+
 - Add streaming responses.
-- Add request queueing.
+- Add a queue in front of the engine.
+- Explore Go for the server.
+
+Engine:
+
+- Pass `past_key_values` through the decode loop.
+- Add prefill versus decode timing.
+- Add time-to-first-token metrics.
 - Add cancellation.
-- Add batching.
+- Add continuous batching.
+- Add a logical KV block allocator for paged cache management.
+
+Runtime:
+
+- Hold KV cache tensors, then accept block tables on `forward`.
 - Explore quantization.
-- Split API server from model worker.
-- Explore Go for API/control-plane infrastructure.
-- Explore C++/CUDA for lower-level backend pieces.
-- Study paged/slotted KV cache management.
-- Explore distributed inference runtime concepts.
+- Explore C++/CUDA/Triton kernels.
+- Split a worker process out of the server process to host the runtime.
+- Explore distributed execution.

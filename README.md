@@ -2,7 +2,7 @@
 
 Glassbox is a local LLM inference stack built to learn ML inference infrastructure by progressively replacing black-box abstractions with explicit implementations.
 
-The goal is to start with a working end-to-end model server, then peel back each layer of the stack: client, server, runtime, engine, backend, and hardware.
+The goal is to start with a working end-to-end model server, then peel back each layer of the stack: client, server, engine, runtime, and hardware.
 
 ## Target MVP
 
@@ -21,7 +21,7 @@ Install the project and its dependencies:
 uv sync
 ```
 
-Glassbox reads its runtime configuration from environment variables:
+Glassbox reads its configuration from environment variables:
 
 | Variable | Default | Allowed values |
 | --- | --- | --- |
@@ -73,50 +73,37 @@ Client / curl / benchmark / harness
                     |
                     v
 +---------------------------------------+
-| Inference Server                      |
+| Server                                |
 | FastAPI                               |
 |                                       |
 | - /health                             |
 | - /v1/models                          |
 | - /v1/completions                     |
 | - /v1/chat/completions                |
-| - OpenAI-compatible request handling  |
 | - request validation                  |
 | - response formatting                 |
-| - later: streaming and queueing       |
+| - later: streaming and a request queue|
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
-| Inference Runtime                     |
+| Engine                                |
 |                                       |
-| - model/tokenizer lifecycle           |
-| - prompt formatting                   |
-| - generation configuration            |
-| - inference orchestration             |
-| - latency, token, and memory metrics  |
-| - later: prefill/decode split         |
-| - later: KV cache visibility          |
+| - tokenizer and prompt formatting     |
+| - decode loop, sampling, and stop     |
+| - token counts and request latency    |
+| - later: scheduler and paged KV map   |
 +-------------------+-------------------+
                     |
                     v
 +---------------------------------------+
-| Inference Engine                      |
+| Runtime                               |
 |                                       |
-| v0: black-box HF generation path      |
-| v1: model.forward() + greedy decoding |
-| v2: explicit past_key_values usage    |
-| later: custom execution pieces        |
+| - load weights and device buffers     |
+| - v0: model.generate() token ids      |
+| - v1: forward(...) -> logits          |
+| - later: KV cache and custom kernels  |
 +-------------------+-------------------+
-                    |
-                    v
-+---------------------------------------+
-| Backend                               |
-|                                       |
-| - v0: PyTorch execution under HF      |
-| - later: explicit PyTorch operations  |
-| - later: custom CUDA/Triton kernels   |
--------------------+-------------------+
                     |
                     v
 +---------------------------------------+
@@ -136,58 +123,50 @@ Start with a working local FastAPI server that exposes OpenAI-compatible endpoin
 
 Goal: make Glassbox usable as an actual inference service before replacing internal model execution pieces.
 
-### 2. Server → Runtime: Isolate inference orchestration
+### 2. Server → Engine → Runtime: Walk the stack with a black box
 
-Move all model-specific logic out of the API routes and into a runtime layer.
+The server calls the engine with text. The engine tokenizes, calls the runtime, and decodes. The runtime's first implementation is Hugging Face `model.generate()`.
 
-The server should handle HTTP, validation, and response formatting. The runtime should handle prompt formatting, model/tokenizer lifecycle, generation configuration, and metrics.
+Goal: prove the full stack works end-to-end before opening the generation loop.
 
-Goal: keep serving concerns separate from inference execution concerns.
+### 3. Engine → Runtime: Replace `model.generate()`
 
-### 3. Runtime → Engine: Start with a black-box engine
-
-Use Hugging Face `model.generate()` as the first engine implementation.
-
-Goal: prove the full stack works end-to-end before breaking the model execution abstraction.
-
-### 4. Runtime → Engine: Replace `model.generate()`
-
-Replace Hugging Face generation with a custom greedy decoding loop using `model.forward(...)`.
+The engine runs a greedy loop. The runtime's public method becomes `forward(...) -> logits` on the PyTorch module.
 
 Goal: understand token-by-token generation, logits, next-token selection, stopping conditions, and output decoding.
 
-### 5. Engine → Backend → Hardware: Make device behavior explicit
+### 4. Runtime → Hardware: Make device behavior explicit
 
 Move from CPU execution to explicit CUDA execution with clear dtype and tensor-placement rules.
 
 Goal: understand where the model lives, where tensors live, how fp32/fp16 affects memory, and how GPU memory pressure appears during inference.
 
-### 6. Runtime → Engine: Add prefill/decode visibility
+### 5. Engine → Runtime: Add prefill/decode visibility
 
-Measure prompt prefill separately from token-by-token decoding. Later, expose and use `past_key_values`.
+Measure prompt prefill separately from token-by-token decoding. Later, the runtime accepts `past_key_values` and the engine passes them through the loop.
 
 Goal: understand why real inference systems separate prompt processing from incremental decoding.
 
-### 7. Client → Server: Add serving features after single-request inference works
+### 6. Server: Add serving features after single-request inference works
 
-Add streaming, request cancellation, request queueing, and eventually batching.
+Add streaming and a queue in front of the engine. Cancellation, continuous batching, and the logical KV block map belong to the engine once that queue exists.
 
-Goal: move from a toy local server toward real inference-serving behavior without mixing serving logic into the runtime or engine.
+Goal: move from a toy local server toward real inference-serving behavior while each feature stays in the layer that owns it.
 
-### 8. Engine → Backend → Hardware: Defer lower-level execution work
+### 7. Runtime: Defer lower-level execution work
 
 After the Python stack is solid, explore quantization, custom PyTorch execution pieces, C++ extensions, CUDA/Triton kernels, or lower-level memory management.
 
-Goal: only break into lower-level implementation once the higher-level stack boundaries are real and stable.
+Goal: only break into lower-level implementation once the server, engine, and runtime boundaries are real and stable.
 
 
 ## MVP Milestones
 
 1. Project skeleton with FastAPI, config, README, and minimal tests.
 2. OpenAI-compatible API shell with `/health`, `/v1/models`, `/v1/completions`, and `/v1/chat/completions`.
-3. `gpt2` walking skeleton on CPU using Hugging Face `model.generate()`.
+3. `gpt2` walking skeleton on CPU. The server calls the engine, and the runtime uses Hugging Face `model.generate()`.
 4. Tiny benchmark script for a fixed prompt suite.
-5. Custom greedy decoding on `gpt2` without `model.generate()`.
+5. Custom greedy decoding on `gpt2`. The engine owns the loop, and the runtime exposes `forward(...) -> logits`.
 6. Explicit GPU path with CUDA, fp16, and GPU memory metrics.
 7. TinyLlama final MVP on GPU without offloading.
 8. Final writeup with demos, benchmarks, tradeoffs, and deferred roadmap.
@@ -204,9 +183,9 @@ These are intentionally out of scope for the first MVP:
 - Quantization.
 - CPU/GPU offloading.
 - Go control plane.
-- C++ or CUDA backend code.
+- C++ or CUDA kernel code.
 - Docker.
-- Distributed inference runtime.
+- Distributed execution.
 
 ## More Detail
 
