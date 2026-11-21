@@ -37,6 +37,8 @@ export GLASSBOX_DEVICE=cpu
 export GLASSBOX_MAX_TOKENS=128
 ```
 
+The server starts with no weights loaded. The `model` field on a completion selects the model. The first request for a supported model loads it, and later requests for that same model reuse the load. A different supported model replaces it. Only `openai-community/gpt2` is supported. `GLASSBOX_MODEL` does not select the loaded model.
+
 Start the local API server:
 
 ```bash

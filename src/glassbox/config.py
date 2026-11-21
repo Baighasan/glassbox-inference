@@ -6,7 +6,7 @@ from typing import Literal
 
 Device = Literal["cpu", "cuda"]
 
-DEFAULT_MODEL = "gpt2"
+DEFAULT_MODEL = "openai-community/gpt2"
 DEFAULT_DEVICE: Device = "cpu"
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_TOKENS = 64

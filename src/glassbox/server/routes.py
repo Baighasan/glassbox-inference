@@ -123,7 +123,7 @@ async def chat_completions(
     return ChatCompletionResponse(
         id=f"chatcmpl-{uuid.uuid4().hex[:12]}",
         created=int(time.time()),
-        model="openai-community/gpt2",
+        model=payload.model,
         choices=[
             ChatCompletionResponseChoice(
                 index=0,

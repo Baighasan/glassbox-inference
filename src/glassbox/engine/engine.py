@@ -1,10 +1,10 @@
 from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
 from glassbox.engine.model import ModelManager
-
+from glassbox.config import DEFAULT_MODEL
 
 async def generate(
     model_manager: ModelManager,
-    model_name: str = "openai-community/gpt2",
+    model_name: str = DEFAULT_MODEL,
     text: str = "",
     max_tokens: int = DEFAULT_MAX_TOKENS,
     temperature: float = DEFAULT_TEMPERATURE,

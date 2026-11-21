@@ -4,16 +4,16 @@ from fastapi import HTTPException
 import torch
 from transformers import pipeline, Pipeline
 
-from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
+from glassbox.config import DEFAULT_DEVICE, DEFAULT_MODEL
 
 
 class ModelManager:
-    def __init__(self, model_name: str = "openai-community/gpt2"):
+    def __init__(self, model_name: str = DEFAULT_MODEL):
         self.model_name = model_name
         self.model: Pipeline = None
         self.lock = asyncio.Lock()
 
-    async def get_model(self, task: str = "text-generation", model_name: str = "openai-community/gpt2") -> Pipeline:
+    async def get_model(self, task: str = "text-generation", model_name: str = DEFAULT_MODEL) -> Pipeline:
         """ Get the model by name. """
 
         # TODO: Remove this once we support more models
@@ -31,7 +31,7 @@ class ModelManager:
                     pipeline,
                     task=task,
                     model=model_name,
-                    device_map="cpu"
+                    device_map=DEFAULT_DEVICE
                 )
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to load model '{model_name}': {str(e)}")

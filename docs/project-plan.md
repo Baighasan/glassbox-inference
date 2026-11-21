@@ -106,7 +106,7 @@ logits = forward(input_ids, attention_mask)
 
 Responsibilities:
 
-- Load one model at startup and fail startup if loading fails.
+- Start with no weights loaded. The completion `model` field selects the model. Load it on the first request, reuse it for later requests of the same model, and replace it when a different supported model is requested. A failed load is an error on that request.
 - Place weights and tensors on `cpu` or `cuda`.
 - Use `float32` on CPU and `float16` on CUDA.
 - Report `model_load_seconds`, `device`, `dtype`, `gpu_memory_allocated_mb`, and `gpu_memory_reserved_mb`.
@@ -186,13 +186,15 @@ GLASSBOX_MAX_TOKENS=128
 
 Rules:
 
-- Load one model per server process.
-- Load the model at server startup.
-- Fail startup if model loading fails.
+- Start the process with no weights loaded.
+- The completion `model` field selects the model. `GLASSBOX_MODEL` does not.
+- Reject an unsupported model name before loading. Only `openai-community/gpt2` is supported.
+- Load on the first request for a supported model, and reuse that load for later requests of the same model.
+- A request for a different supported model unloads the previous weights and loads the new ones.
+- A failed load is an error on that request.
 - Require explicit device selection: `cpu` or `cuda`.
 - Use `float32` on CPU.
 - Use `float16` on CUDA.
-- Do not switch models after startup in the MVP.
 
 ## Metrics
 
@@ -216,11 +218,11 @@ Ownership:
 
 `/health` should include:
 
-- loaded status
-- configured model
+- loaded status, false until a model has been loaded
+- loaded model name
 - device
 - dtype
-- model load time
+- model load time once a load has completed
 
 ## Milestones
 
@@ -274,7 +276,7 @@ Outcome:
 Work:
 
 - Add `server`, `engine`, and `runtime` packages matching the ownership above.
-- Load `gpt2` and its tokenizer at startup.
+- Load `gpt2` and its tokenizer on the first supported completion, and reuse that load afterward.
 - Engine formats the completion prompt and decodes new token ids.
 - Runtime call is Hugging Face `model.generate()`.
 - Return only new generated text.
