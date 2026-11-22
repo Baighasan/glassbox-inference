@@ -19,6 +19,7 @@ from glassbox.server.schemas import (
     ModelListResponse,
     UsageInfo,
 )
+from glassbox.config import DEFAULT_MODEL
 
 
 router = APIRouter()
@@ -54,8 +55,7 @@ def _mock_metrics(
 async def health(request: Request) -> HealthResponse:
     return HealthResponse(
         status="alive",
-        loaded=False if request.app.state.model_manager.model is None else True,
-        model=request.app.state.model_manager.model_name,
+        model=DEFAULT_MODEL,
         device="cpu",
         dtype="float32",
     )
@@ -66,7 +66,7 @@ async def models(request: Request) -> ModelListResponse:
     return ModelListResponse(
         data=[
             ModelInfo(
-                id=request.app.state.model_manager.model_name,
+                id=DEFAULT_MODEL,
                 created=0,
             )
         ]
