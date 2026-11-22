@@ -1,10 +1,8 @@
 import time
 import uuid
-from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
-from glassbox.engine.engine import engine
 from glassbox.server.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -53,9 +51,11 @@ def _mock_metrics(
 
 @router.get("/health", response_model=HealthResponse)
 async def health(request: Request) -> HealthResponse:
+    loaded_model = request.app.state.engine.loaded_model
     return HealthResponse(
         status="alive",
-        model=DEFAULT_MODEL,
+        loaded=loaded_model is not None,
+        model=loaded_model or DEFAULT_MODEL,
         device="cpu",
         dtype="float32",
     )
@@ -77,10 +77,11 @@ async def models(request: Request) -> ModelListResponse:
 @router.post("/v1/completions", response_model=CompletionResponse)
 async def completions(
     payload: CompletionRequest,
+    request: Request,
 ) -> CompletionResponse:
     started_at = time.perf_counter()
 
-    generated_text = await engine(
+    generated_text = await request.app.state.engine.generate(
         model_name=payload.model,
         text=payload.prompt,
         max_tokens=payload.max_tokens,
