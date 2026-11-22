@@ -66,7 +66,7 @@ async def models(request: Request) -> ModelListResponse:
     return ModelListResponse(
         data=[
             ModelInfo(
-                id="openai-community/gpt2",
+                id=request.app.state.model_manager.model_name,
                 created=0,
             )
         ]

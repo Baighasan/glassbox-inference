@@ -10,39 +10,21 @@ from glassbox.config import DEFAULT_DEVICE, DEFAULT_MODEL
 class ModelManager:
     def __init__(self, model_name: str = DEFAULT_MODEL):
         self.model_name = model_name
-        self.model: Pipeline = None
         self.lock = asyncio.Lock()
+        self.model: Pipeline = pipeline(
+            task="text-generation",
+            model=model_name,
+            device_map=DEFAULT_DEVICE,
+        )
 
     async def get_model(self, task: str = "text-generation", model_name: str = DEFAULT_MODEL) -> Pipeline:
-        """ Get the model by name. """
-
-        # TODO: Remove this once we support more models
-        if model_name != "openai-community/gpt2":
-            raise HTTPException(status_code=404, detail="Only openai-community/gpt2 is supported at the moment.")
-
-        async with self.lock:
-            # If the model is already loaded, return it
-            if self.model and self.model_name == model_name:
-                return self.model
-
-            # Load the new model in a background thread so the event loop stays responsive
-            try:
-                new_pipe = await asyncio.to_thread(
-                    pipeline,
-                    task=task,
-                    model=model_name,
-                    device_map=DEFAULT_DEVICE
-                )
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to load model '{model_name}': {str(e)}")
-
-            # Unload the old model if it exists
-            if self.model:
-                self._unload_model(self.model)
-
-            self.model = new_pipe
-            self.model_name = model_name
-            return new_pipe
+        """Return the model loaded at startup."""
+        if model_name != self.model_name:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Only {self.model_name} is supported at the moment.",
+            )
+        return self.model
 
     def _unload_model(self, pipe: Pipeline):
         """ Explicitly free CPU and GPU memory. """
