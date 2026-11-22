@@ -3,16 +3,16 @@ from fastapi import APIRouter, FastAPI
 
 from glassbox.server.routes import router
 
-from glassbox.engine.model import ModelManager
 
-
+"""
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize manager
-    app.state.model_manager = ModelManager()
+    # Startup: Initialize model
+    app.state.model = await get_model()
     yield
     # Shutdown: Free all models
-    await app.state.model_manager.shutdown()
+    unload_model(app.state.model)
+    """
 
 
 def create_app(
@@ -22,7 +22,7 @@ def create_app(
         title="Glassbox",
         description="A local LLM inference server.",
         version="0.1.0",
-        lifespan=lifespan,
+        #lifespan=lifespan,
     )
     app.include_router(api_router)
     return app

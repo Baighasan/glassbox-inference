@@ -4,13 +4,12 @@ from typing import Any
 import httpx
 import pytest
 
-from glassbox.config import Settings
 from glassbox.server.app import create_app
 
 
 class ASGITestClient:
-    def __init__(self, settings: Settings) -> None:
-        self.app = create_app(settings=settings)
+    def __init__(self) -> None:
+        self.app = create_app()
 
     def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         async def send_request() -> httpx.Response:
@@ -32,10 +31,4 @@ class ASGITestClient:
 
 @pytest.fixture
 def client() -> ASGITestClient:
-    return ASGITestClient(
-        Settings(
-            model="test-model",
-            device="cpu",
-            max_tokens=64,
-        )
-    )
+    return ASGITestClient()

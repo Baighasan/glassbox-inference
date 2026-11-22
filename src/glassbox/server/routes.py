@@ -4,7 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 
-from glassbox.engine.engine import generate
+from glassbox.engine.engine import engine
 from glassbox.server.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -77,12 +77,10 @@ async def models(request: Request) -> ModelListResponse:
 @router.post("/v1/completions", response_model=CompletionResponse)
 async def completions(
     payload: CompletionRequest,
-    request: Request,
 ) -> CompletionResponse:
     started_at = time.perf_counter()
 
-    generated_text = await generate(
-        model_manager=request.app.state.model_manager,
+    generated_text = await engine(
         model_name=payload.model,
         text=payload.prompt,
         max_tokens=payload.max_tokens,
