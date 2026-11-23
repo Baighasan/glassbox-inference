@@ -230,7 +230,7 @@ Progress:
 
 - [x] Milestone 1: Project Skeleton
 - [x] Milestone 2: OpenAI API Shell
-- [ ] Milestone 3: GPT-2 Walking Skeleton
+- [x] Milestone 3: GPT-2 Walking Skeleton
 - [ ] Milestone 4: Benchmark Script
 - [ ] Milestone 5: Break `model.generate()` On GPT-2
 - [ ] Milestone 6: GPU Path
@@ -267,7 +267,7 @@ Work:
 - [x] Add strict validation for unsupported dangerous fields.
 - [x] Add OpenAI-style response formatting.
 
-### Milestone 3: GPT-2 Walking Skeleton
+### Milestone 3: GPT-2 Walking Skeleton - Complete
 
 Outcome:
 
@@ -275,14 +275,14 @@ Outcome:
 
 Work:
 
-- Add `server`, `engine`, and `runtime` packages matching the ownership above.
-- Load `gpt2` and its tokenizer on the first supported completion, and reuse that load afterward.
-- Engine formats the completion prompt and decodes new token ids.
-- Runtime call is Hugging Face `model.generate()`.
-- Return only new generated text.
-- Add real usage stats and `glassbox_metrics`.
-- Demo with `curl`.
-- Leave `/v1/chat/completions` on the mock response until Milestone 7.
+- [x] Add `server`, `engine`, and `runtime` packages matching the ownership above.
+- [x] Load `gpt2` and its tokenizer on the first supported completion, and reuse that load afterward.
+- [x] Engine formats the completion prompt and decodes new token ids.
+- [x] Runtime call is Hugging Face `model.generate()`.
+- [x] Return only new generated text.
+- [x] Add real usage stats and `glassbox_metrics`.
+- [x] Demo with `curl`.
+- [x] Leave `/v1/chat/completions` on the mock response until Milestone 7.
 
 ### Milestone 4: Benchmark Script
 
