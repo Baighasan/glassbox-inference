@@ -13,12 +13,15 @@ class ASGITestClient:
 
     def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         async def send_request() -> httpx.Response:
-            transport = httpx.ASGITransport(app=self.app)
-            async with httpx.AsyncClient(
-                transport=transport,
-                base_url="http://testserver",
-            ) as client:
-                return await client.request(method, path, **kwargs)
+            # httpx ASGITransport does not run ASGI lifespan; enter it explicitly
+            # so app.state.engine is created before route handlers run.
+            async with self.app.router.lifespan_context(self.app):
+                transport = httpx.ASGITransport(app=self.app)
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="http://testserver",
+                ) as client:
+                    return await client.request(method, path, **kwargs)
 
         return asyncio.run(send_request())
 

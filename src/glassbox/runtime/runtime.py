@@ -3,7 +3,7 @@ import time
 import torch
 from transformers import AutoModelForCausalLM, PreTrainedModel
 
-from glassbox.config import DEFAULT_DEVICE
+from glassbox.config import DEFAULT_DEVICE, DEFAULT_DTYPE, Device, Dtype
 
 
 class Runtime:
@@ -13,6 +13,8 @@ class Runtime:
         self.model: PreTrainedModel | None = None
         self.model_name: str | None = None
         self.model_load_seconds: float | None = None
+        self.device: Device = DEFAULT_DEVICE
+        self.dtype: Dtype = DEFAULT_DTYPE
 
     def load(self, model_name: str) -> PreTrainedModel:
         """Load weights for model_name, reusing them when that model is already resident."""
@@ -20,7 +22,7 @@ class Runtime:
             return self.model
 
         started_at = time.perf_counter()
-        model = AutoModelForCausalLM.from_pretrained(model_name).to(DEFAULT_DEVICE)
+        model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         self.model = model
         self.model_name = model_name
         self.model_load_seconds = time.perf_counter() - started_at

@@ -17,7 +17,7 @@ from glassbox.server.schemas import (
     ModelListResponse,
     UsageInfo,
 )
-from glassbox.config import DEFAULT_MODEL, DEFAULT_DEVICE
+from glassbox.config import DEFAULT_MODEL, DEFAULT_DEVICE, DEFAULT_DTYPE
 from glassbox.engine.exceptions import UnsupportedModelError
 
 
@@ -43,8 +43,9 @@ def _mock_metrics(
     return GlassboxMetrics(
         total_latency_ms=latency_ms,
         tokens_per_second=usage.completion_tokens / elapsed_seconds,
-        device="cpu",
-        dtype="float32",
+        device=DEFAULT_DEVICE,
+        dtype=DEFAULT_DTYPE,
+        model_load_seconds=None,
         gpu_memory_allocated_mb=0,
         gpu_memory_reserved_mb=0,
     )
@@ -52,13 +53,16 @@ def _mock_metrics(
 
 @router.get("/health", response_model=HealthResponse)
 async def health(request: Request) -> HealthResponse:
-    loaded_model = request.app.state.engine.loaded_model
+    engine = request.app.state.engine
+    runtime = engine.runtime
+    loaded_model = engine.loaded_model
     return HealthResponse(
         status="alive",
         loaded=loaded_model is not None,
         model=loaded_model or DEFAULT_MODEL,
-        device="cpu",
-        dtype="float32",
+        device=runtime.device,
+        dtype=runtime.dtype,
+        model_load_seconds=runtime.model_load_seconds,
     )
 
 
@@ -80,9 +84,10 @@ async def completions(
     payload: CompletionRequest,
     request: Request,
 ) -> CompletionResponse:
+    engine = request.app.state.engine
 
     try:
-        completion_result = await request.app.state.engine.generate(
+        completion_result = await engine.generate(
             model_name=payload.model,
             text=payload.prompt,
             max_tokens=payload.max_tokens,
@@ -96,11 +101,13 @@ async def completions(
         completion_tokens=completion_result.completion_tokens,
         total_tokens=completion_result.prompt_tokens + completion_result.completion_tokens,
     )
+    runtime = engine.runtime
     metrics = GlassboxMetrics(
         total_latency_ms=completion_result.latency_ms,
         tokens_per_second=completion_result.tokens_per_second,
-        device=DEFAULT_DEVICE,
-        dtype="float32",
+        device=runtime.device,
+        dtype=runtime.dtype,
+        model_load_seconds=runtime.model_load_seconds,
         gpu_memory_allocated_mb=0,
         gpu_memory_reserved_mb=0,
     )

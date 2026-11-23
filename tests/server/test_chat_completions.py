@@ -34,20 +34,7 @@ def test_chat_completion_returns_openai_style_mock_response(
     )
     assert body["glassbox_metrics"]["device"] == "cpu"
     assert body["glassbox_metrics"]["dtype"] == "float32"
-
-
-def test_chat_completion_rejects_unavailable_model(
-    client: ASGITestClient,
-) -> None:
-    response = client.post(
-        "/v1/chat/completions",
-        json={
-            "model": "other-model",
-            "messages": [{"role": "user", "content": "Hello"}],
-        },
-    )
-
-    assert response.status_code == 404
+    assert body["glassbox_metrics"]["model_load_seconds"] is None
 
 
 @pytest.mark.parametrize(

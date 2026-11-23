@@ -8,7 +8,7 @@ def test_health_reports_configured_runtime(client: ASGITestClient) -> None:
     assert response.json() == {
         "status": "alive",
         "loaded": False,
-        "model": "test-model",
+        "model": "openai-community/gpt2",
         "device": "cpu",
         "dtype": "float32",
         "model_load_seconds": None,
@@ -25,7 +25,7 @@ def test_models_lists_only_the_configured_model(
         "object": "list",
         "data": [
             {
-                "id": "test-model",
+                "id": "openai-community/gpt2",
                 "object": "model",
                 "created": 0,
                 "owned_by": "glassbox",

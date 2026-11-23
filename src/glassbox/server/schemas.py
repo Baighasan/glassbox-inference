@@ -6,6 +6,8 @@ from glassbox.config import (
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     MAX_ALLOWED_TOKENS,
+    Device,
+    Dtype,
 )
 
 
@@ -27,7 +29,7 @@ class CompletionRequest(StrictRequest):
         ge=1,
         le=MAX_ALLOWED_TOKENS,
     )
-    temperature: float = DEFAULT_TEMPERATURE
+    temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0, le=0)
     stream: Literal[False] = False
 
 
@@ -41,8 +43,9 @@ class CompletionResponseChoice(BaseModel):
 class GlassboxMetrics(BaseModel):
     total_latency_ms: float
     tokens_per_second: float
-    device: Literal["cpu", "cuda"]
-    dtype: Literal["float32", "float16"]
+    device: Device
+    dtype: Dtype
+    model_load_seconds: float | None
     gpu_memory_allocated_mb: float
     gpu_memory_reserved_mb: float
 
@@ -65,7 +68,7 @@ class ChatMessage(BaseModel):
 class ChatCompletionRequest(StrictRequest):
     model: str
     messages: list[ChatMessage] = Field(min_length=1)
-    temperature: float = DEFAULT_TEMPERATURE
+    temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0, le=0)
     max_tokens: int = Field(
         default=DEFAULT_MAX_TOKENS,
         ge=1,
@@ -96,8 +99,9 @@ class HealthResponse(BaseModel):
     status: Literal["alive"]
     loaded: bool
     model: str
-    device: Literal["cpu", "cuda"]
-    dtype: Literal["float32", "float16"]
+    device: Device
+    dtype: Dtype
+    model_load_seconds: float | None
 
 
 class ModelInfo(BaseModel):

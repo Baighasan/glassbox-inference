@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
-from glassbox.config import DEFAULT_DEVICE, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 from glassbox.engine.exceptions import UnsupportedModelError
 from glassbox.runtime.runtime import Runtime
 
@@ -48,7 +48,9 @@ class Engine:
 
         started_at = time.perf_counter()
 
-        input_ids = self.tokenizer(text, return_tensors="pt").input_ids.to(DEFAULT_DEVICE)
+        input_ids = self.tokenizer(text, return_tensors="pt").input_ids.to(
+            self.runtime.device
+        )
         generated_ids = self.runtime.generate(
             input_ids,
             model_name,

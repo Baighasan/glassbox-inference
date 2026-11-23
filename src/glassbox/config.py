@@ -5,9 +5,11 @@ from typing import Literal
 
 
 Device = Literal["cpu", "cuda"]
+Dtype = Literal["float32", "float16"]
 
 DEFAULT_MODEL = "openai-community/gpt2"
 DEFAULT_DEVICE: Device = "cpu"
+DEFAULT_DTYPE: Dtype = "float32"
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_TOKENS = 64
 MAX_ALLOWED_TOKENS = 128
