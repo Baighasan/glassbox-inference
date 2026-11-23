@@ -1,3 +1,5 @@
+import time
+
 import torch
 from transformers import AutoModelForCausalLM, PreTrainedModel
 
@@ -10,6 +12,19 @@ class Runtime:
     def __init__(self) -> None:
         self.model: PreTrainedModel | None = None
         self.model_name: str | None = None
+        self.model_load_seconds: float | None = None
+
+    def load(self, model_name: str) -> PreTrainedModel:
+        """Load weights for model_name, reusing them when that model is already resident."""
+        if self.model is not None and self.model_name == model_name:
+            return self.model
+
+        started_at = time.perf_counter()
+        model = AutoModelForCausalLM.from_pretrained(model_name).to(DEFAULT_DEVICE)
+        self.model = model
+        self.model_name = model_name
+        self.model_load_seconds = time.perf_counter() - started_at
+        return model
 
     def generate(
         self,
@@ -19,11 +34,9 @@ class Runtime:
         temperature: float,
     ) -> torch.Tensor:
         """Return new token ids for an already-tokenized prompt."""
-        if self.model is None or self.model_name != model_name:
-            self.model = AutoModelForCausalLM.from_pretrained(model_name).to(DEFAULT_DEVICE)
-            self.model_name = model_name
+        model = self.load(model_name)
 
-        generated_ids = self.model.generate(
+        generated_ids = model.generate(
             input_ids,
             max_new_tokens=max_tokens,
             temperature=temperature,
@@ -35,3 +48,4 @@ class Runtime:
         """Drop the loaded weights."""
         self.model = None
         self.model_name = None
+        self.model_load_seconds = None

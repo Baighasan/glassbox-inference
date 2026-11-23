@@ -1,7 +1,7 @@
 import time
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from glassbox.server.schemas import (
     ChatCompletionRequest,
@@ -17,7 +17,8 @@ from glassbox.server.schemas import (
     ModelListResponse,
     UsageInfo,
 )
-from glassbox.config import DEFAULT_MODEL
+from glassbox.config import DEFAULT_MODEL, DEFAULT_DEVICE
+from glassbox.engine.exceptions import UnsupportedModelError
 
 
 router = APIRouter()
@@ -79,16 +80,30 @@ async def completions(
     payload: CompletionRequest,
     request: Request,
 ) -> CompletionResponse:
-    started_at = time.perf_counter()
 
-    generated_text = await request.app.state.engine.generate(
-        model_name=payload.model,
-        text=payload.prompt,
-        max_tokens=payload.max_tokens,
-        temperature=payload.temperature,
+    try:
+        completion_result = await request.app.state.engine.generate(
+            model_name=payload.model,
+            text=payload.prompt,
+            max_tokens=payload.max_tokens,
+            temperature=payload.temperature,
+        )
+    except UnsupportedModelError as e:
+        raise HTTPException(status_code=404, detail=f"Model {payload.model} not found") from e
+
+    usage = UsageInfo(
+        prompt_tokens=completion_result.prompt_tokens,
+        completion_tokens=completion_result.completion_tokens,
+        total_tokens=completion_result.prompt_tokens + completion_result.completion_tokens,
     )
-    
-    usage = _mock_usage(payload.prompt, generated_text)
+    metrics = GlassboxMetrics(
+        total_latency_ms=completion_result.latency_ms,
+        tokens_per_second=completion_result.tokens_per_second,
+        device=DEFAULT_DEVICE,
+        dtype="float32",
+        gpu_memory_allocated_mb=0,
+        gpu_memory_reserved_mb=0,
+    )
 
     return CompletionResponse(
         id=f"cmpl-{uuid.uuid4().hex[:12]}",
@@ -96,14 +111,14 @@ async def completions(
         model=payload.model,
         choices=[
             CompletionResponseChoice(
-                text=generated_text,
+                text=completion_result.generated_text,
                 index=0,
                 logprobs=None,
                 finish_reason="stop",
             )
         ],
         usage=usage,
-        glassbox_metrics=_mock_metrics(started_at, usage),
+        glassbox_metrics=metrics,
     )
 
 
@@ -111,7 +126,6 @@ async def completions(
 @router.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(
     payload: ChatCompletionRequest,
-    request: Request,
 ) -> ChatCompletionResponse:
     started_at = time.perf_counter()
 
