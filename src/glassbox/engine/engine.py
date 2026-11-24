@@ -6,6 +6,8 @@ from glassbox.runtime.runtime import Runtime
 
 import time
 from dataclasses import dataclass
+from typing import Any
+import torch
 
 @dataclass(frozen=True)
 class CompletionResult:
@@ -40,7 +42,6 @@ class Engine:
         if model_name != DEFAULT_MODEL:
             raise UnsupportedModelError(model_name)
 
-        # load the tokenizer
         if self.tokenizer is None or self.tokenizer_name != model_name:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.tokenizer_name = model_name
@@ -52,17 +53,51 @@ class Engine:
         # tokenize the input
         tokenized_input = self.tokenizer(text, return_tensors="pt")
 
-        # get the input ids and attention mask and move them to the device
+        # get the input ids and attention mask
         input_ids = tokenized_input.input_ids
         attention_mask = tokenized_input.attention_mask
 
-        generated_ids = self.runtime.generate(
-            input_ids,
-            attention_mask,
-            model_name,
-            max_tokens,
-            temperature,
-        )
+        prompt_length = input_ids.shape[1]
+
+        # get stop token id
+        eos_id = self.tokenizer.eos_token_id
+
+        # Handle both single integers (e.g., 50256) and lists of integers (e.g., Llama 3)
+        # We won't run into lists of integers for now, but this is the correct way to handle it
+        eos_ids = {eos_id} if isinstance(eos_id, int) else set[Any](eos_id)
+
+         # generate tokens
+        for _ in range(max_tokens):
+            # get the logits for the input     
+            logits = self.runtime.forward(input_ids, attention_mask)
+
+            # Greedy decoding: take logits of the last token and select the highest value
+            next_token_logits = logits[:, -1, :]    # tensor is [batch, vocab]
+            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True).to(input_ids.device)
+
+            # Append predicted token to the full sequence
+            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+
+            # Extend attention_mask by 1 to account for the new token
+            attention_mask = torch.cat(
+                [
+                    attention_mask,
+                    torch.ones(
+                        (attention_mask.shape[0], 1), 
+                        device=attention_mask.device,
+                        dtype=attention_mask.dtype
+                    )
+                ],
+                dim=-1,
+            )
+
+            # Stop if End-of-Sequence token is generated
+            if next_token_id.item() in eos_ids:
+                break
+
+        # Return the generated tokens slicing off the prompt
+        generated_ids = input_ids[:, prompt_length:]
+
         # decode the generated ids
         generated_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
@@ -71,7 +106,7 @@ class Engine:
         completion_result = CompletionResult(
             generated_text=generated_text,
             prompt_text=text,
-            prompt_tokens=input_ids.shape[1],
+            prompt_tokens=prompt_length,
             completion_tokens=completion_tokens,
             latency_ms=elapsed_seconds * 1000,
             tokens_per_second=completion_tokens / max(elapsed_seconds, 1e-9),
