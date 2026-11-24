@@ -7,7 +7,7 @@ from glassbox.config import DEFAULT_DEVICE, DEFAULT_DTYPE, Device, Dtype
 
 
 class Runtime:
-    """Owns model weights and the black-box generation call."""
+    """Owns model weights forward pass."""
 
     def __init__(self) -> None:
         self.model: PreTrainedModel | None = None

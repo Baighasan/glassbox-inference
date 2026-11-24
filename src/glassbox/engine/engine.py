@@ -15,6 +15,7 @@ class CompletionResult:
     prompt_text: str
     prompt_tokens: int
     completion_tokens: int
+    completion_token_ids: tuple[int, ...]
     latency_ms: float
     tokens_per_second: float
 
@@ -97,6 +98,7 @@ class Engine:
 
         # Return the generated tokens slicing off the prompt
         generated_ids = input_ids[:, prompt_length:]
+        completion_token_ids = tuple(int(token_id) for token_id in generated_ids[0].tolist())
 
         # decode the generated ids
         generated_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
@@ -108,6 +110,7 @@ class Engine:
             prompt_text=text,
             prompt_tokens=prompt_length,
             completion_tokens=completion_tokens,
+            completion_token_ids=completion_token_ids,
             latency_ms=elapsed_seconds * 1000,
             tokens_per_second=completion_tokens / max(elapsed_seconds, 1e-9),
         )

@@ -28,3 +28,7 @@ build-backend = "uv_build"
 dev = [
     "pyright>=1.1.414",
 ]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not model'"
+markers = ["model: loads gpt2 and runs a real forward pass"]

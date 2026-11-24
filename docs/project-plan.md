@@ -231,8 +231,8 @@ Progress:
 - [x] Milestone 1: Project Skeleton
 - [x] Milestone 2: OpenAI API Shell
 - [x] Milestone 3: GPT-2 Walking Skeleton
-- [ ] Milestone 4: Benchmark Script
-- [ ] Milestone 5: Break `model.generate()` On GPT-2
+- [x] Milestone 4: Benchmark Script
+- [x] Milestone 5: Break `model.generate()` On GPT-2
 - [ ] Milestone 6: GPU Path
 - [ ] Milestone 7: TinyLlama Final MVP
 - [ ] Milestone 8: Final MVP Writeup
@@ -284,7 +284,7 @@ Work:
 - [x] Demo with `curl`.
 - [x] Leave `/v1/chat/completions` on the mock response until Milestone 7.
 
-### Milestone 4: Benchmark Script
+### Milestone 4: Benchmark Script - Complete
 
 Outcome:
 
@@ -292,17 +292,17 @@ Outcome:
 
 Prompt suite:
 
-- Short prompt.
-- Medium prompt.
-- Chat-style prompt.
+- [x] Short prompt.
+- [x] Medium prompt.
+- [x] Chat-style prompt.
 
 Work:
 
-- Add `scripts/bench.py`.
-- Print results to stdout.
-- Do not persist benchmark results yet.
+- [x] Add `scripts/bench.py`.
+- [x] Print results to stdout.
+- [x] Do not persist benchmark results yet.
 
-### Milestone 5: Break `model.generate()` On GPT-2
+### Milestone 5: Break `model.generate()` On GPT-2 - Complete
 
 Outcome:
 
@@ -310,12 +310,11 @@ Outcome:
 
 Work:
 
-- Remove the `model.generate()` path.
-- Run the full sequence through `model.forward(...)` each step.
-- Engine selects the next token with `argmax`.
-- Append the token and repeat until `max_tokens` or EOS.
-- Compare the loop against Hugging Face `generate()` on a fixed prompt.
-- Document why full-sequence recomputation is inefficient.
+- [x] Remove the `model.generate()` path.
+- [x] Run the full sequence through `model.forward(...)` each step.
+- [x] Engine selects the next token with `argmax`.
+- [x] Append the token and repeat until `max_tokens` or EOS.
+- [x] Compare the loop against Hugging Face `generate()` on a fixed prompt.
 
 This is intentionally Level B decoding:
 
