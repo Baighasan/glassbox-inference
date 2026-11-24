@@ -40,6 +40,7 @@ class Engine:
         if model_name != DEFAULT_MODEL:
             raise UnsupportedModelError(model_name)
 
+        # load the tokenizer
         if self.tokenizer is None or self.tokenizer_name != model_name:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.tokenizer_name = model_name
@@ -48,15 +49,21 @@ class Engine:
 
         started_at = time.perf_counter()
 
-        input_ids = self.tokenizer(text, return_tensors="pt").input_ids.to(
-            self.runtime.device
-        )
+        # tokenize the input
+        tokenized_input = self.tokenizer(text, return_tensors="pt")
+
+        # get the input ids and attention mask and move them to the device
+        input_ids = tokenized_input.input_ids
+        attention_mask = tokenized_input.attention_mask
+
         generated_ids = self.runtime.generate(
             input_ids,
+            attention_mask,
             model_name,
             max_tokens,
             temperature,
         )
+        # decode the generated ids
         generated_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
         elapsed_seconds = time.perf_counter() - started_at
