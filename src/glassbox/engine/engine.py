@@ -8,8 +8,9 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from glassbox.config import (
     DEFAULT_DEVICE,
     DEFAULT_MAX_TOKENS,
-    DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
+    DEFAULT_MODEL,
+    SupportedModels,
     Device,
 )
 from glassbox.engine.exceptions import UnsupportedModelError
@@ -52,7 +53,7 @@ class Engine:
         temperature: float = DEFAULT_TEMPERATURE,
     ) -> CompletionResult:
         """Generate completion text for one request."""
-        if model_name != DEFAULT_MODEL:
+        if model_name not in SupportedModels:
             raise UnsupportedModelError(model_name)
 
         # check if tokenizer is already initialized

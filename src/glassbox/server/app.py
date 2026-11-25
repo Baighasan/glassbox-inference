@@ -1,3 +1,5 @@
+import logging
+
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -6,6 +8,8 @@ from glassbox.config import load_settings
 from glassbox.engine.engine import Engine
 from glassbox.server.routes import router
 
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,6 +23,8 @@ async def lifespan(app: FastAPI):
 def create_app(
     api_router: APIRouter = router,
 ) -> FastAPI:
+    logger.debug("Debug mode enabled")
+    
     app = FastAPI(
         title="Glassbox",
         description="A local LLM inference server.",
@@ -27,6 +33,6 @@ def create_app(
     )
     app.include_router(api_router)
     return app
-
-
+    
+    
 app = create_app()
