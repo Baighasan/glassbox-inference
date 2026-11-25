@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from glassbox.config import (
+    DEFAULT_DEVICE,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     MAX_ALLOWED_TOKENS,
@@ -24,6 +25,7 @@ class StrictRequest(BaseModel):
 class CompletionRequest(StrictRequest):
     model: str
     prompt: str
+    device: Device = DEFAULT_DEVICE
     max_tokens: int = Field(
         default=DEFAULT_MAX_TOKENS,
         ge=1,
@@ -46,8 +48,9 @@ class GlassboxMetrics(BaseModel):
     device: Device
     dtype: Dtype
     model_load_seconds: float | None
-    gpu_memory_allocated_mb: float
-    gpu_memory_reserved_mb: float
+    gpu_memory_allocated_mb: float | None
+    gpu_peak_memory_allocated_mb: float | None
+    gpu_memory_reserved_mb: float | None
 
 
 class CompletionResponse(BaseModel):

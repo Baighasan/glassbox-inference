@@ -233,7 +233,7 @@ Progress:
 - [x] Milestone 3: GPT-2 Walking Skeleton
 - [x] Milestone 4: Benchmark Script
 - [x] Milestone 5: Break `model.generate()` On GPT-2
-- [ ] Milestone 6: GPU Path
+- [x] Milestone 6: GPU Path
 - [ ] Milestone 7: TinyLlama Final MVP
 - [ ] Milestone 8: Final MVP Writeup
 
@@ -329,7 +329,7 @@ prompt tokens
 
 KV cache decoding is deferred.
 
-### Milestone 6: GPU Path
+### Milestone 6: GPU Path - Complete
 
 Outcome:
 
@@ -337,12 +337,12 @@ Outcome:
 
 Work:
 
-- Support `GLASSBOX_DEVICE=cpu|cuda`.
-- Move model and tensors to the selected device.
-- Use `float32` on CPU.
-- Use `float16` on CUDA.
-- Measure GPU memory allocated and reserved.
-- Benchmark `gpt2` CPU vs GPU.
+- [x] Support `GLASSBOX_DEVICE=cpu|cuda`.
+- [x] Move model and tensors to the selected device.
+- [x] Use `float32` on CPU.
+- [x] Use `float16` on CUDA.
+- [x] Measure GPU memory allocated and reserved.
+- [x] Benchmark `gpt2` CPU vs GPU.
 
 ### Milestone 7: TinyLlama Final MVP
 

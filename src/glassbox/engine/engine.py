@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
-from glassbox.config import DEFAULT_MAX_TOKENS, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+from glassbox.config import DEFAULT_DEVICE, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, Device, DEFAULT_TEMPERATURE
 from glassbox.engine.exceptions import UnsupportedModelError
 from glassbox.runtime.runtime import Runtime
 
@@ -18,6 +18,9 @@ class CompletionResult:
     completion_token_ids: tuple[int, ...]
     latency_ms: float
     tokens_per_second: float
+    gpu_memory_allocated_mb: float | None
+    gpu_peak_memory_allocated_mb: float | None
+    gpu_memory_reserved_mb: float | None
 
 class Engine:
     """Tokenizes a prompt, calls the runtime, and decodes new token ids."""
@@ -36,6 +39,7 @@ class Engine:
         self,
         model_name: str,
         text: str,
+        device: Device = DEFAULT_DEVICE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
     ) -> CompletionResult:
@@ -43,13 +47,17 @@ class Engine:
         if model_name != DEFAULT_MODEL:
             raise UnsupportedModelError(model_name)
 
+        # check if tokenizer is already initialized
         if self.tokenizer is None or self.tokenizer_name != model_name:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.tokenizer_name = model_name
 
+        self.runtime.set_device(device)
         self.runtime.load(model_name)
 
+        # initialize metric variables
         started_at = time.perf_counter()
+        gpu_peak_memory_allocated_mb = None
 
         # tokenize the input
         tokenized_input = self.tokenizer(text, return_tensors="pt")
@@ -69,8 +77,16 @@ class Engine:
 
          # generate tokens
         for _ in range(max_tokens):
-            # get the logits for the input     
-            logits = self.runtime.forward(input_ids, attention_mask)
+            # get the logits for the input
+            output = self.runtime.forward(input_ids, attention_mask)
+
+            logits = output.logits
+            if self.runtime.device == "cuda":
+                gpu_peak_memory_allocated_mb = (
+                    max(gpu_peak_memory_allocated_mb, output.gpu_peak_memory_allocated_mb)
+                    if gpu_peak_memory_allocated_mb is not None
+                    else output.gpu_peak_memory_allocated_mb
+                )
 
             # Greedy decoding: take logits of the last token and select the highest value
             next_token_logits = logits[:, -1, :]    # tensor is [batch, vocab]
@@ -113,6 +129,9 @@ class Engine:
             completion_token_ids=completion_token_ids,
             latency_ms=elapsed_seconds * 1000,
             tokens_per_second=completion_tokens / max(elapsed_seconds, 1e-9),
+            gpu_memory_allocated_mb=output.gpu_memory_allocated_mb,
+            gpu_peak_memory_allocated_mb=gpu_peak_memory_allocated_mb,
+            gpu_memory_reserved_mb=output.gpu_memory_reserved_mb,
         )
         return completion_result
 

@@ -20,6 +20,8 @@ from glassbox.server.schemas import (
 from glassbox.config import DEFAULT_MODEL, DEFAULT_DEVICE, DEFAULT_DTYPE
 from glassbox.engine.exceptions import UnsupportedModelError
 
+import torch
+
 
 router = APIRouter()
 
@@ -47,6 +49,7 @@ def _mock_metrics(
         dtype=DEFAULT_DTYPE,
         model_load_seconds=None,
         gpu_memory_allocated_mb=0,
+        gpu_peak_memory_allocated_mb=0,
         gpu_memory_reserved_mb=0,
     )
 
@@ -61,7 +64,7 @@ async def health(request: Request) -> HealthResponse:
         loaded=loaded_model is not None,
         model=loaded_model or DEFAULT_MODEL,
         device=runtime.device,
-        dtype=runtime.dtype,
+        dtype="float32" if runtime.dtype == torch.float32 else "float16",
         model_load_seconds=runtime.model_load_seconds,
     )
 
@@ -90,6 +93,7 @@ async def completions(
         completion_result = await engine.generate(
             model_name=payload.model,
             text=payload.prompt,
+            device=payload.device,
             max_tokens=payload.max_tokens,
             temperature=payload.temperature,
         )
@@ -106,10 +110,11 @@ async def completions(
         total_latency_ms=completion_result.latency_ms,
         tokens_per_second=completion_result.tokens_per_second,
         device=runtime.device,
-        dtype=runtime.dtype,
+        dtype="float32" if runtime.dtype == torch.float32 else "float16",
         model_load_seconds=runtime.model_load_seconds,
-        gpu_memory_allocated_mb=0,
-        gpu_memory_reserved_mb=0,
+        gpu_memory_allocated_mb=completion_result.gpu_memory_allocated_mb,
+        gpu_peak_memory_allocated_mb=completion_result.gpu_peak_memory_allocated_mb,
+        gpu_memory_reserved_mb=completion_result.gpu_memory_reserved_mb,
     )
 
     return CompletionResponse(
