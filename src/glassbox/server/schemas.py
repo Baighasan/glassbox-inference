@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from glassbox.config import (
-    DEFAULT_DEVICE,
     DEFAULT_MAX_TOKENS,
     DEFAULT_TEMPERATURE,
     MAX_ALLOWED_TOKENS,
@@ -25,9 +24,10 @@ class StrictRequest(BaseModel):
 class CompletionRequest(StrictRequest):
     model: str
     prompt: str
-    device: Device = DEFAULT_DEVICE
-    max_tokens: int = Field(
-        default=DEFAULT_MAX_TOKENS,
+    # None means the route should use the process settings.
+    device: Device | None = None
+    max_tokens: int | None = Field(
+        default=None,
         ge=1,
         le=MAX_ALLOWED_TOKENS,
     )

@@ -48,9 +48,9 @@ def _mock_metrics(
         device=DEFAULT_DEVICE,
         dtype=DEFAULT_DTYPE,
         model_load_seconds=None,
-        gpu_memory_allocated_mb=0,
-        gpu_peak_memory_allocated_mb=0,
-        gpu_memory_reserved_mb=0,
+        gpu_memory_allocated_mb=None,
+        gpu_peak_memory_allocated_mb=None,
+        gpu_memory_reserved_mb=None,
     )
 
 
@@ -88,13 +88,16 @@ async def completions(
     request: Request,
 ) -> CompletionResponse:
     engine = request.app.state.engine
+    settings = request.app.state.settings
+    device = settings.device if payload.device is None else payload.device
+    max_tokens = settings.max_tokens if payload.max_tokens is None else payload.max_tokens
 
     try:
         completion_result = await engine.generate(
             model_name=payload.model,
             text=payload.prompt,
-            device=payload.device,
-            max_tokens=payload.max_tokens,
+            device=device,
+            max_tokens=max_tokens,
             temperature=payload.temperature,
         )
     except UnsupportedModelError as e:
@@ -126,7 +129,7 @@ async def completions(
                 text=completion_result.generated_text,
                 index=0,
                 logprobs=None,
-                finish_reason="stop",
+                finish_reason=completion_result.finish_reason,
             )
         ],
         usage=usage,

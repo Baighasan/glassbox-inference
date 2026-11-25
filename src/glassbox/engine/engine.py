@@ -1,13 +1,19 @@
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
-
-from glassbox.config import DEFAULT_DEVICE, DEFAULT_MAX_TOKENS, DEFAULT_MODEL, Device, DEFAULT_TEMPERATURE
-from glassbox.engine.exceptions import UnsupportedModelError
-from glassbox.runtime.runtime import Runtime
-
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Literal
+
 import torch
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
+
+from glassbox.config import (
+    DEFAULT_DEVICE,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_MODEL,
+    DEFAULT_TEMPERATURE,
+    Device,
+)
+from glassbox.engine.exceptions import UnsupportedModelError
+from glassbox.runtime.runtime import Runtime
 
 @dataclass(frozen=True)
 class CompletionResult:
@@ -16,6 +22,7 @@ class CompletionResult:
     prompt_tokens: int
     completion_tokens: int
     completion_token_ids: tuple[int, ...]
+    finish_reason: Literal["stop", "length"]
     latency_ms: float
     tokens_per_second: float
     gpu_memory_allocated_mb: float | None
@@ -25,8 +32,9 @@ class CompletionResult:
 class Engine:
     """Tokenizes a prompt, calls the runtime, and decodes new token ids."""
 
-    def __init__(self) -> None:
+    def __init__(self, device: Device = DEFAULT_DEVICE) -> None:
         self.runtime = Runtime()
+        self.runtime.set_device(device)
         self.tokenizer: PreTrainedTokenizerBase | None = None
         self.tokenizer_name: str | None = None
 
@@ -68,14 +76,16 @@ class Engine:
 
         prompt_length = input_ids.shape[1]
 
-        # get stop token id
+        # None means this tokenizer has no stop id. Integers and lists both occur.
         eos_id = self.tokenizer.eos_token_id
+        if eos_id is None:
+            eos_ids: set[int] = set()
+        elif isinstance(eos_id, int):
+            eos_ids = {eos_id}
+        else:
+            eos_ids = {int(token_id) for token_id in eos_id}
 
-        # Handle both single integers (e.g., 50256) and lists of integers (e.g., Llama 3)
-        # We won't run into lists of integers for now, but this is the correct way to handle it
-        eos_ids = {eos_id} if isinstance(eos_id, int) else set[Any](eos_id)
-
-         # generate tokens
+        finish_reason: Literal["stop", "length"] = "length"
         for _ in range(max_tokens):
             # get the logits for the input
             output = self.runtime.forward(input_ids, attention_mask)
@@ -108,8 +118,9 @@ class Engine:
                 dim=-1,
             )
 
-            # Stop if End-of-Sequence token is generated
+            # An EOS token on the last allowed step finishes as stop.
             if next_token_id.item() in eos_ids:
+                finish_reason = "stop"
                 break
 
         # Return the generated tokens slicing off the prompt
@@ -127,6 +138,7 @@ class Engine:
             prompt_tokens=prompt_length,
             completion_tokens=completion_tokens,
             completion_token_ids=completion_token_ids,
+            finish_reason=finish_reason,
             latency_ms=elapsed_seconds * 1000,
             tokens_per_second=completion_tokens / max(elapsed_seconds, 1e-9),
             gpu_memory_allocated_mb=output.gpu_memory_allocated_mb,

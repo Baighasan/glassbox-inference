@@ -25,19 +25,19 @@ Glassbox reads its configuration from environment variables:
 
 | Variable | Default | Allowed values |
 | --- | --- | --- |
-| `GLASSBOX_MODEL` | `gpt2` | Any non-empty model identifier |
+| `GLASSBOX_MODEL` | `openai-community/gpt2` | Any non-empty model identifier |
 | `GLASSBOX_DEVICE` | `cpu` | `cpu` or `cuda` |
-| `GLASSBOX_MAX_TOKENS` | `128` | Integer from `1` through `128` |
+| `GLASSBOX_MAX_TOKENS` | `64` | Integer from `1` through `128` |
 
 For example:
 
 ```bash
-export GLASSBOX_MODEL=gpt2
+export GLASSBOX_MODEL=openai-community/gpt2
 export GLASSBOX_DEVICE=cpu
-export GLASSBOX_MAX_TOKENS=128
+export GLASSBOX_MAX_TOKENS=64
 ```
 
-The server starts with no weights loaded. The `model` field on a completion selects the model. The first request for a supported model loads it, and later requests for that same model reuse the load. A different supported model replaces it. Only `openai-community/gpt2` is supported. `GLASSBOX_MODEL` does not select the loaded model.
+The server starts with no weights loaded. The `model` field on a completion selects the model. The first request for a supported model loads it, and later requests for that same model reuse the load. A different supported model replaces it. Only `openai-community/gpt2` is supported. `GLASSBOX_MODEL` does not select the loaded model. `GLASSBOX_DEVICE` is the device reported by `/health` and used when a completion omits `device`. `GLASSBOX_MAX_TOKENS` is used when a completion omits `max_tokens`. A request that sets either field overrides the environment. Request `max_tokens` must be from `1` through `128`.
 
 Start the local API server:
 
@@ -52,6 +52,8 @@ Run the test suite:
 ```bash
 uv run --with pytest pytest
 ```
+
+`pytest -m model` also runs the GPT-2 comparison, including the CUDA run when a GPU is available.
 
 Build the wheel and source distribution:
 

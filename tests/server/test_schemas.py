@@ -8,10 +8,11 @@ from glassbox.server.schemas import (
 )
 
 
-def test_completion_request_uses_generation_defaults() -> None:
+def test_completion_request_leaves_device_and_max_tokens_unset() -> None:
     request = CompletionRequest(model="test-model", prompt="Hello")
 
-    assert request.max_tokens == 64
+    assert request.device is None
+    assert request.max_tokens is None
     assert request.temperature == 0
     assert request.stream is False
 

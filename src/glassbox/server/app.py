@@ -2,13 +2,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 
+from glassbox.config import load_settings
 from glassbox.engine.engine import Engine
 from glassbox.server.routes import router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.engine = Engine()
+    settings = load_settings()
+    app.state.settings = settings
+    app.state.engine = Engine(device=settings.device)
     yield
     app.state.engine.shutdown()
 

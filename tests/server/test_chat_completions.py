@@ -35,6 +35,9 @@ def test_chat_completion_returns_openai_style_mock_response(
     assert body["glassbox_metrics"]["device"] == "cpu"
     assert body["glassbox_metrics"]["dtype"] == "float32"
     assert body["glassbox_metrics"]["model_load_seconds"] is None
+    assert body["glassbox_metrics"]["gpu_memory_allocated_mb"] is None
+    assert body["glassbox_metrics"]["gpu_peak_memory_allocated_mb"] is None
+    assert body["glassbox_metrics"]["gpu_memory_reserved_mb"] is None
 
 
 @pytest.mark.parametrize(
