@@ -92,6 +92,7 @@ async def completions(
     device = settings.device if payload.device is None else payload.device
     max_tokens = settings.max_tokens if payload.max_tokens is None else payload.max_tokens
 
+
     try:
         completion_result = await engine.generate(
             model_name=payload.model,

@@ -8,6 +8,8 @@ Device = Literal["cpu", "cuda"]
 Dtype = Literal["float32", "float16"]
 SupportedModels = (
     "openai-community/gpt2", 
+    "openai-community/gpt2-medium",
+    "Qwen/Qwen2.5-0.5B-Instruct",
     "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 )
 

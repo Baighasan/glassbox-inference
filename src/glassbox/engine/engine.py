@@ -1,3 +1,5 @@
+import logging
+
 import time
 from dataclasses import dataclass
 from typing import Literal
@@ -15,6 +17,8 @@ from glassbox.config import (
 )
 from glassbox.engine.exceptions import UnsupportedModelError
 from glassbox.runtime.runtime import Runtime
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CompletionResult:
@@ -60,16 +64,32 @@ class Engine:
         if self.tokenizer is None or self.tokenizer_name != model_name:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.tokenizer_name = model_name
+            logger.info(f"Tokenizer initialized for model: {model_name}")
 
         self.runtime.set_device(device)
         self.runtime.load(model_name)
+        logger.info("Runtime loaded model: %s on device: %s", model_name, device)
 
         # initialize metric variables
         started_at = time.perf_counter()
         gpu_peak_memory_allocated_mb = None
 
-        # tokenize the input
-        tokenized_input = self.tokenizer(text, return_tensors="pt")
+        # tokenize the input, applying the chat template and adding the generation prompt
+        tokenized_input = None
+        if self.tokenizer.chat_template: 
+            tokenized_input = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": text}],
+                tokenize=True,
+                add_generation_prompt=True,
+                return_dict=True,
+                return_tensors="pt"
+            )
+        else:
+            tokenized_input = self.tokenizer(
+                text,
+                return_tensors="pt",
+                add_special_tokens=True,
+            )
 
         # get the input ids and attention mask
         input_ids = tokenized_input.input_ids
@@ -85,6 +105,9 @@ class Engine:
             eos_ids = {eos_id}
         else:
             eos_ids = {int(token_id) for token_id in eos_id}
+        
+        logger.debug("Input IDs for model %s: %s", model_name, input_ids.tolist())
+        logger.debug("eos_ids for model %s: %s", model_name, eos_ids)
 
         finish_reason: Literal["stop", "length"] = "length"
         for _ in range(max_tokens):
@@ -123,13 +146,17 @@ class Engine:
             if next_token_id.item() in eos_ids:
                 finish_reason = "stop"
                 break
-
+        
+        logger.info("Generation completed in %.2f seconds with finish reason: %s", time.perf_counter() - started_at, finish_reason)
         # Return the generated tokens slicing off the prompt
         generated_ids = input_ids[:, prompt_length:]
         completion_token_ids = tuple(int(token_id) for token_id in generated_ids[0].tolist())
+        logger.debug("Generated token IDs: %s", completion_token_ids)
+
 
         # decode the generated ids
         generated_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+        logger.debug("Generated text: %s", generated_text)
 
         elapsed_seconds = time.perf_counter() - started_at
         completion_tokens = generated_ids.shape[1]
@@ -153,3 +180,4 @@ class Engine:
         self.tokenizer = None
         self.tokenizer_name = None
         self.runtime.unload()
+        logger.info("Engine shutdown complete.")

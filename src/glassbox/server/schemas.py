@@ -22,6 +22,20 @@ class StrictRequest(BaseModel):
 
 
 class CompletionRequest(StrictRequest):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "model": "openai-community/gpt2",
+                    "prompt": "The future of computing is",
+                    "device": "cpu",
+                    "max_tokens": 64,
+                    "temperature": 0,
+                    "stream": False,
+                }
+            ]
+        }
+    )
     model: str
     prompt: str
     # None means the route should use the process settings.
