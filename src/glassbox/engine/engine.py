@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import torch
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers import AutoTokenizer, PreTrainedTokenizerBase, Cache
 
 from glassbox.config import (
     DEFAULT_DEVICE,
@@ -108,11 +108,16 @@ class Engine:
         
         logger.debug("Input IDs for model %s: %s", model_name, input_ids.tolist())
         logger.debug("eos_ids for model %s: %s", model_name, eos_ids)
+        
+        kv_cache: Cache | None = None
+        step_token_id: torch.Tensor | None = None
 
         finish_reason: Literal["stop", "length"] = "length"
         for _ in range(max_tokens):
             # get the logits for the input
-            output = self.runtime.forward(input_ids, attention_mask)
+            step_input_ids = input_ids if kv_cache is None else input_ids[:, -1:]
+            output = self.runtime.forward(step_input_ids, attention_mask, kv_cache)
+            kv_cache = output.past_key_values
 
             logits = output.logits
             if self.runtime.device == "cuda":
@@ -123,11 +128,10 @@ class Engine:
                 )
 
             # Greedy decoding: take logits of the last token and select the highest value
-            next_token_logits = logits[:, -1, :]    # tensor is [batch, vocab]
-            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True).to(input_ids.device)
+            step_token_id = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True).to(input_ids.device)
 
             # Append predicted token to the full sequence
-            input_ids = torch.cat([input_ids, next_token_id], dim=-1)
+            input_ids = torch.cat([input_ids, step_token_id], dim=-1)
 
             # Extend attention_mask by 1 to account for the new token
             attention_mask = torch.cat(
@@ -143,7 +147,7 @@ class Engine:
             )
 
             # An EOS token on the last allowed step finishes as stop.
-            if next_token_id.item() in eos_ids:
+            if step_token_id.item() in eos_ids:
                 finish_reason = "stop"
                 break
         

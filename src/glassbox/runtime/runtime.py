@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 
 import torch
-from transformers import AutoModelForCausalLM, PreTrainedModel
+from transformers import AutoModelForCausalLM, PreTrainedModel, Cache
 
 from glassbox.config import (
     DEFAULT_DEVICE,
@@ -15,6 +15,7 @@ from typing import Literal
 @dataclass(frozen=True)
 class CompletionResult:
     logits: torch.Tensor
+    past_key_values: Cache
     gpu_memory_allocated_mb: float | None
     gpu_peak_memory_allocated_mb: float | None
     gpu_memory_reserved_mb: float | None
@@ -65,7 +66,7 @@ class Runtime:
             return False
         return parameter.device.type == self.device and parameter.dtype == self.dtype
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> CompletionResult:
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, past_key_values: Cache | None) -> CompletionResult:
         """Return logits and device memory stats for the given inputs."""
         input_ids = input_ids.to(self.device)
         attention_mask = attention_mask.to(self.device)
@@ -78,7 +79,12 @@ class Runtime:
             if self.device == "cuda":
                 torch.cuda.reset_peak_memory_stats()
 
-            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, use_cache=False)
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                past_key_values=past_key_values,
+                use_cache=True
+            )
 
             if self.device == "cuda":
                 torch.cuda.synchronize()
@@ -88,6 +94,7 @@ class Runtime:
 
         return CompletionResult(
             logits=outputs.logits,
+            past_key_values=outputs.past_key_values,
             gpu_memory_allocated_mb=gpu_memory_allocated_mb,
             gpu_peak_memory_allocated_mb=gpu_peak_memory_allocated_mb,
             gpu_memory_reserved_mb=gpu_memory_reserved_mb,
