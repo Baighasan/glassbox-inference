@@ -7,10 +7,12 @@ from typing import Literal
 Device = Literal["cpu", "cuda"]
 Dtype = Literal["float32", "float16"]
 SupportedModels = (
-    "openai-community/gpt2", 
-    "openai-community/gpt2-medium",
-    "Qwen/Qwen2.5-0.5B-Instruct",
-    "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    "distilbert/distilgpt2",                # fp32 - can use for smoke tests since its fast
+    "openai-community/gpt2",                # fp32
+    "openai-community/gpt2-medium",         # fp32
+    "EleutherAI/gpt-neo-125m",              # fp32
+    "Qwen/Qwen2.5-0.5B-Instruct",           # fp16
+    "TinyLlama/TinyLlama-1.1B-Chat-v1.0"    # fp16
 )
 
 DEFAULT_MODEL = "openai-community/gpt2"
