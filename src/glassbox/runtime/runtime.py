@@ -28,7 +28,7 @@ class Runtime:
         self.model_name: str | None = None
         self.model_load_seconds: float | None = None
         self.device: Device = DEFAULT_DEVICE
-        self.dtype: Literal[torch.float32, torch.float16] = torch.float32
+        self.dtype: torch.dtype = torch.float32
 
     def set_device(self, device: Device) -> None:
         #self.dtype = torch.float16 if device == "cuda" else torch.float32 # TODO optimize fp16 on quadro t2000
