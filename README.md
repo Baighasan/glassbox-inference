@@ -6,6 +6,56 @@ The first version delegated generation to Hugging Face `model.generate()`. Today
 
 ## How it works
 
+```text
++-----------------------------------------------------------+
+| Client                                                    |
+|                                                           |
+| - Send a model ID and prompt to /v1/completions           |
+| - Set device and max_tokens per request                   |
+| - Read generated text, token usage, and glassbox_metrics  |
++-----------------------------------------------------------+
+                              |
+                              v
++-----------------------------------------------------------+
+| Server (FastAPI)                                          |
+|                                                           |
+| - Validate JSON with Pydantic and apply request defaults  |
+| - GET /health and /v1/models                              |
+| - POST /v1/completions runs inference                     |
+| - POST /v1/chat/completions returns a mock response       |
++-----------------------------------------------------------+
+                              |
+                              v
++-----------------------------------------------------------+
+| Engine                                                    |
+|                                                           |
+| - Apply the tokenizer's chat template when available      |
+| - Prefill with all prompt token IDs                       |
+| - Decode with one new token and the request's KV cache    |
+| - Select tokens by greedy argmax until EOS or max_tokens  |
++-----------------------------------------------------------+
+                              |
+                              v
++-----------------------------------------------------------+
+| Runtime (PyTorch + Transformers)                          |
+|                                                           |
+| - Load and reuse one resident model                       |
+| - Move token IDs and attention mask to the device         |
+| - Run the model forward in torch.inference_mode()         |
+| - Return logits, updated KV cache, and CUDA memory stats  |
++-----------------------------------------------------------+
+                              |
+                              v
++-----------------------------------------------------------+
+| Hardware                                                  |
+|                                                           |
+| - CPU holds weights and KV tensors in system RAM          |
+| - CUDA GPU holds weights and KV tensors in VRAM           |
+| - FP32 inference on both devices                          |
+| - Target GPU is a 4 GiB NVIDIA Quadro T2000               |
++-----------------------------------------------------------+
+```
+
 - **Server** uses FastAPI to validate requests and return generated text, token usage, latency, throughput, and device metrics.
 - **Engine** formats and tokenizes the prompt, runs a full prompt prefill, then sends one new token per decode step with the request's KV cache. It selects tokens with greedy argmax and stops at an end-of-sequence token or the requested limit.
 - **Runtime** loads one model at a time, places weights and inputs on CPU or CUDA, and returns logits, the updated Transformers cache, and CUDA memory metrics. Inference currently uses FP32 on both devices.
